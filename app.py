@@ -8,7 +8,7 @@ from timezonefinder import TimezoneFinder
 import pandas as pd
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Vedic Matcher", page_icon="🕉️", layout="centered")
+st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
 
 # --- DATA CONSTANTS ---
 NAKSHATRAS = [
@@ -33,21 +33,12 @@ NAK_TO_RASHI_MAP = {
     24: [10, 11], 25: [11], 26: [11]
 }
 
-# --- TRANSIT DATA (Approximate Solar Months) ---
-# Maps Rashi Index (0=Aries) to Date Range
+# --- TRANSIT DATA ---
 SUN_TRANSIT_DATES = {
-    0: "Apr 14 - May 14",   # Sun in Aries
-    1: "May 15 - Jun 14",   # Sun in Taurus
-    2: "Jun 15 - Jul 15",   # Sun in Gemini
-    3: "Jul 16 - Aug 16",   # Sun in Cancer
-    4: "Aug 17 - Sep 16",   # Sun in Leo
-    5: "Sep 17 - Oct 16",   # Sun in Virgo
-    6: "Oct 17 - Nov 15",   # Sun in Libra
-    7: "Nov 16 - Dec 15",   # Sun in Scorpio
-    8: "Dec 16 - Jan 13",   # Sun in Sagittarius
-    9: "Jan 14 - Feb 12",   # Sun in Capricorn
-    10: "Feb 13 - Mar 13",  # Sun in Aquarius
-    11: "Mar 14 - Apr 13"   # Sun in Pisces
+    0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15",
+    3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16",
+    6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13",
+    9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"
 }
 
 # --- LOGIC DATA ---
@@ -66,7 +57,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v11", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v12", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -130,37 +121,60 @@ def predict_marriage_luck_years(rashi_idx):
     return predictions
 
 def predict_wedding_month(rashi_idx):
-    # Only check House 7 (Partnership/Marriage)
     h = 7
     target_rashi = (rashi_idx + h - 1) % 12
-    date_range = SUN_TRANSIT_DATES[target_rashi]
-    return date_range
+    return SUN_TRANSIT_DATES[target_rashi]
+
+# --- ADVANCED CALCULATIONS ---
+def calculate_advanced(b_nak, g_nak):
+    # 1. Mahendra Porutham (Wealth/Attachment)
+    # Count from Girl to Boy
+    count = (b_nak - g_nak) % 27 + 1
+    mahendra = "Absent"
+    if count in [4, 7, 10, 13, 16, 19, 22, 25]:
+        mahendra = "Present ✅"
+    
+    # 2. Stree Deergha (Distance/Wellbeing)
+    # Distance from Girl to Boy
+    dist = (b_nak - g_nak) % 27
+    stree_deergha = "Weak"
+    if dist > 13:
+        stree_deergha = "Excellent ✅"
+    elif dist > 7:
+        stree_deergha = "Good"
+        
+    return mahendra, stree_deergha
 
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0
     breakdown = []
     
-    # Standard Calculations
+    # 36 Point Logic
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     score += varna
     breakdown.append(("Varna", varna, 1))
+    
     vashya = 2 if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi] else 0.5
     score += vashya
     breakdown.append(("Vashya", vashya, 2))
+    
     count = (b_nak - g_nak) % 27 + 1
     tara = 3 if count % 9 not in [3, 5, 7] else 0 
     score += tara
     breakdown.append(("Tara", tara, 3))
+    
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
     if id_b == id_g: yoni = 4
     elif YONI_Enemy_Map[id_b] == id_g or YONI_Enemy_Map[id_g] == id_b: yoni = 0
     else: yoni = 2 
     score += yoni
     breakdown.append(("Yoni", yoni, 4))
+    
     lb, lg = RASHI_LORDS[b_rashi], RASHI_LORDS[g_rashi]
     maitri = MAITRI_TABLE[lb][lg]
     score += maitri
     breakdown.append(("Maitri", maitri, 5))
+    
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     if gb == gg: gana = 6
     elif (gg==0 and gb==2) or (gg==2 and gb==0): gana = 1 
@@ -168,20 +182,32 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     else: gana = 5 
     score += gana
     breakdown.append(("Gana", gana, 6))
+    
     dist = (b_rashi - g_rashi) % 12
     bhakoot = 7
     if dist in [1, 11, 4, 8, 5, 7]: bhakoot = 0
-    if bhakoot == 0 and maitri >= 4: bhakoot = 7 # Exception
+    if bhakoot == 0 and maitri >= 4: bhakoot = 7 
     score += bhakoot
     breakdown.append(("Bhakoot", bhakoot, 7))
+    
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
     nadi = 8
-    if nb == ng: nadi = 0
-    if nadi == 0 and b_rashi == g_rashi and b_nak != g_nak: nadi = 8 # Exception
+    # Nadi Logic with Cancellation
+    nadi_status_msg = "OK"
+    if nb == ng: 
+        nadi = 0
+        nadi_status_msg = "Dosha"
+    
+    # Nadi Cancellation Check: Same Rashi OR Friends
+    if nadi == 0:
+        if b_rashi == g_rashi or maitri >= 4:
+            nadi = 8 # Give points back or consider neutral
+            nadi_status_msg = "Cancelled (Valid)"
+            
     score += nadi
     breakdown.append(("Nadi", nadi, 8))
     
-    # Checks
+    # Safety Checks (Rajju/Vedha)
     rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
@@ -196,22 +222,21 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     vedha_status = "Pass"
     if vedha_pairs.get(g_nak) == b_nak:
         vedha_status = "Fail"
-    
-    return score, breakdown, rajju_status, vedha_status
+        
+    return score, breakdown, rajju_status, vedha_status, nadi_status_msg
 
 # --- UI ---
-st.title("🕉️ Vedic Matcher")
-st.markdown("Calculate compatibility using Ashta Koota (36 Points) + South Indian Dosha Check.")
+st.title("🕉️ Vedic Matcher Pro")
+st.markdown("Advanced Compatibility: 36 Points + South Indian Checks + Mahendra/Stree Deergha.")
 
 mode = st.radio("Choose Input Mode:", ["Use Birth Details", "Direct Star Entry"], horizontal=True)
 
 if mode == "Use Birth Details":
-    st.info("ℹ️ Note: You can type specific minutes (e.g., 10:13) in the Time box if not found in the dropdown.")
+    st.info("ℹ️ You can type specific minutes (e.g., 10:13) in the Time box.")
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Boy Details")
         b_date = st.date_input("Boy Date", datetime.date(1995, 1, 1))
-        # step=60 allows minute selection
         b_time = st.time_input("Boy Time", datetime.time(10, 0), step=60)
         b_city = st.text_input("Boy City", "Hyderabad")
         b_country = st.text_input("Boy Country", "India")
@@ -219,7 +244,6 @@ if mode == "Use Birth Details":
     with c2:
         st.subheader("Girl Details")
         g_date = st.date_input("Girl Date", datetime.date(1994, 11, 28))
-        # step=60 allows minute selection
         g_time = st.time_input("Girl Time", datetime.time(7, 30), step=60)
         g_city = st.text_input("Girl City", "Hyderabad")
         g_country = st.text_input("Girl Country", "India")
@@ -263,7 +287,8 @@ if st.button("Calculate Match", type="primary"):
             g_nak = NAKSHATRAS.index(g_star)
             g_rashi = RASHIS.index(g_rashi_sel)
 
-        score, breakdown, rajju_status, vedha_status = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
+        score, breakdown, rajju_status, vedha_status, nadi_msg = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
+        mahendra, stree_deergha = calculate_advanced(b_nak, g_nak)
         
         st.divider()
         col1, col2 = st.columns(2)
@@ -273,96 +298,81 @@ if st.button("Calculate Match", type="primary"):
         st.subheader(f"Score: {score} / 36")
         st.progress(score/36)
         
+        # Verdict
         critical_fail = False
         if rajju_status == "Fail" or vedha_status == "Fail":
             st.error("⚠️ **Compatibility Alignment Check Required**")
-            st.info("""
-            **Consultation Recommended:** The compatibility tool has identified a few incompatibilities.
-            
-            This does not strictly mean "No". 
-            It is highly recommended to consult a professional astrologer who can look at the **entire birth chart** (including Lagna, 7th House, and planetary positions) to see if there are specific cancellations or other strengths that neutralize this effect.
-            """)
+            st.info("Incompatibilities detected (Rajju/Vedha). Professional consultation recommended to check for cancellations based on Lagna.")
             critical_fail = True
         elif rajju_status == "Cancelled":
-            st.warning("⚠️ Incompatibilities Detected but Neutralized (Planetary Friendship).")
+            st.warning("⚠️ Incompatibilities detected but neutralized (Planetary Friendship).")
             
         if not critical_fail:
             if score >= 25:
-                st.success("✅ EXCELLENT MATCH (Highly Recommended)")
+                st.success("✅ EXCELLENT MATCH")
             elif score >= 18:
-                st.success("✅ GOOD MATCH (Proceed)")
+                st.success("✅ GOOD MATCH")
             else:
-                st.warning("⚠️ NOT RECOMMENDED (Score too low)")
+                # Check if Mahendra saves it
+                if mahendra == "Present ✅":
+                     st.warning("⚠️ Score is low, BUT Mahendra Porutham is Present. This indicates strong attachment/family growth potential despite low score.")
+                else:
+                     st.warning("⚠️ NOT RECOMMENDED (Score too low)")
         
-        with st.expander("See Detailed Breakdown"):
+        # TABS FOR DATA
+        tab1, tab2 = st.tabs(["📊 Breakdown", "✨ Advanced Checks"])
+        
+        with tab1:
             df = pd.DataFrame(breakdown, columns=["Koota", "Points", "Max"])
             st.table(df)
+            if "Cancelled" in nadi_msg:
+                 st.caption("ℹ️ Nadi Dosha was found but Cancelled due to Friendship/Rashi rules.")
 
-        # --- PREDICTIVE TIMING ---
+        with tab2:
+            st.markdown("### Additional South Indian Indicators")
+            st.markdown("These checks provide deeper insight beyond the points.")
+            chk_data = [
+                ("Mahendra Porutham", mahendra, "Indicates Wealth, Attachment & Progeny"),
+                ("Stree Deergha", stree_deergha, "Indicates General Wellbeing & Distance")
+            ]
+            df_adv = pd.DataFrame(chk_data, columns=["Check", "Status", "Meaning"])
+            st.table(df_adv)
+
+        # --- PREDICTIVE ---
         st.divider()
         with st.expander("🔮 Bonus: Marriage Timing & Wedding Months"):
             st.markdown("### 1. Favorable Years (Jupiter Transit)")
-            st.markdown("Jupiter's position for the next 3 years. Lucky houses: 2, 5, 7, 9, 11.")
             st.caption("")
-            
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("**Boy's Lucky Years:**")
-                b_years = predict_marriage_luck_years(b_rashi)
-                for year, result, desc in b_years:
-                    color = "green" if "Excellent" in result else "grey"
-                    st.markdown(f"- **{year}:** :{color}[{result}]")
+                for y, r, d in predict_marriage_luck_years(b_rashi):
+                    color = "green" if "Excellent" in r else "grey"
+                    st.markdown(f"- **{y}:** :{color}[{r}]")
             with c2:
                 st.markdown("**Girl's Lucky Years:**")
-                g_years = predict_marriage_luck_years(g_rashi)
-                for year, result, desc in g_years:
-                    color = "green" if "Excellent" in result else "grey"
-                    st.markdown(f"- **{year}:** :{color}[{result}]")
+                for y, r, d in predict_marriage_luck_years(g_rashi):
+                    color = "green" if "Excellent" in r else "grey"
+                    st.markdown(f"- **{y}:** :{color}[{r}]")
 
-            st.markdown("---")
-            st.markdown("### 2. Best Wedding Month (Sun Transit)")
-            st.caption("The 30-day window each year when the Sun is in your 7th House (Marriage Sector), making it ideal for weddings.")
-            
+            st.markdown("### 2. Best Wedding Month")
             mc1, mc2 = st.columns(2)
             with mc1:
-                st.markdown("**Boy's Best Month:**")
-                b_month = predict_wedding_month(b_rashi)
-                st.markdown(f"💍 **{b_month}** (Every Year)")
-
+                st.markdown(f"**Boy:** 💍 {predict_wedding_month(b_rashi)}")
             with mc2:
-                st.markdown("**Girl's Best Month:**")
-                g_month = predict_wedding_month(g_rashi)
-                st.markdown(f"💍 **{g_month}** (Every Year)")
+                st.markdown(f"**Girl:** 💍 {predict_wedding_month(g_rashi)}")
             
     except Exception as e:
         st.error(f"An error occurred: {e}")
 
-# --- HOW IT WORKS & DISCLAIMER ---
+# --- HOW IT WORKS ---
 st.divider()
 with st.expander("ℹ️ How this App Works"):
     st.markdown("""
-    This app uses a smart **Hybrid Logic** combining the best of both traditions:
-
-    1.  **First, it acts like a South Indian Astrologer (The Safety Check):**
-        * It checks for specific star alignments called **Rajju** (Body Compatibility).
-        * Imagine the stars mapped to a human body. Traditionally, if both partners belong to the same body part (e.g., both are "Head"), it creates an energetic imbalance.
-        * 
-        * If an incompatibility is found, the app advises professional consultation to check for exceptions.
-        
-    2.  **Then, it acts like a North Indian Astrologer (The Scoring):**
-        * If the safety checks pass, it calculates the **36 Gunas (Ashta Koota)**.
-        * This scores compatibility across 8 areas, ranging from spiritual (Varna) to biological (Nadi).
-        * 
-        * **Final Score:**
-            * **25+:** Excellent
-            * **18-24:** Good
-            * **Below 18:** Not Recommended
+    **1. South Indian Checks (Safety):** Checks **Rajju** (Body) & **Vedha** (Enemies). 
+    **2. North Indian Score (Compatibility):** 36 Point system. 
+    **3. Advanced Checks (Accuracy):** checks **Mahendra** (Wealth) & **Stree Deergha** (Wellbeing).
     """)
-
+    
 with st.expander("⚖️ Disclaimer"):
-    st.caption("""
-    **For Informational Purposes Only.** This application calculates compatibility based on standard astrological algorithms (Lahiri Ayanamsa). 
-    **Important:** This app cannot check 7th/8th House strength (Mangal Dosha) as that requires exact birth time to calculate the Ascendant (Lagna). 
-    Astrology is a complex field. A computer program cannot replace the intuition and detailed analysis of a qualified human astrologer. 
-    Do not make major life decisions solely based on this tool.
-    """)
+    st.caption("For Informational Purposes Only. Consult a professional astrologer for final decisions.")
