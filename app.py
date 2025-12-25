@@ -49,7 +49,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v7", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v8", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -87,24 +87,62 @@ def get_sidereal_moon(date_obj, time_obj, city, country, manual_tz):
 def get_nak_rashi(long):
     return int(long / 13.333333), int(long / 30)
 
+# --- PREDICTION LOGIC (NEW) ---
+def get_jupiter_position_for_year(year):
+    # Calculate approx Jupiter position for July 1st of that year
+    # This gives the dominant sign for the year
+    dt = datetime.date(year, 7, 1)
+    obs = ephem.Observer()
+    obs.date = dt
+    jupiter = ephem.Jupiter()
+    jupiter.compute(obs)
+    ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    sidereal_long = (math.degrees(ecl.lon) - ayanamsa) % 360
+    return int(sidereal_long / 30) # Returns Rashi Index
+
+def predict_marriage_luck(rashi_idx):
+    predictions = []
+    # Check 2025, 2026, 2027
+    check_years = [2025, 2026, 2027]
+    
+    for year in check_years:
+        jup_rashi = get_jupiter_position_for_year(year)
+        # Calculate House position from Moon (1-based count)
+        # Formula: (Jupiter - Moon) % 12 + 1
+        # Python modulo of negative handles circular correctly, but let's be safe
+        diff = (jup_rashi - rashi_idx) % 12
+        house = diff + 1
+        
+        # Houses 2, 5, 7, 9, 11 are Auspicious for Marriage
+        if house in [2, 5, 7, 9, 11]:
+            predictions.append((year, "✨ Excellent Year", "Jupiter is in a favorable position (House " + str(house) + ") to bless marriage events."))
+        else:
+            predictions.append((year, "Neutral Year", "Jupiter is in House " + str(house) + ". Progress is possible but requires effort."))
+            
+    return predictions
+
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0
     breakdown = []
     
-    # Standard Calculations
+    # 1. VARNA
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     score += varna
     breakdown.append(("Varna", varna, 1))
     
+    # 2. VASHYA
     vashya = 2 if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi] else 0.5
     score += vashya
     breakdown.append(("Vashya", vashya, 2))
     
+    # 3. TARA
     count = (b_nak - g_nak) % 27 + 1
     tara = 3 if count % 9 not in [3, 5, 7] else 0 
     score += tara
     breakdown.append(("Tara", tara, 3))
     
+    # 4. YONI
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
     if id_b == id_g: yoni = 4
     elif YONI_Enemy_Map[id_b] == id_g or YONI_Enemy_Map[id_g] == id_b: yoni = 0
@@ -112,11 +150,13 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += yoni
     breakdown.append(("Yoni", yoni, 4))
     
+    # 5. MAITRI
     lb, lg = RASHI_LORDS[b_rashi], RASHI_LORDS[g_rashi]
     maitri = MAITRI_TABLE[lb][lg]
     score += maitri
     breakdown.append(("Maitri", maitri, 5))
     
+    # 6. GANA
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     if gb == gg: gana = 6
     elif (gg==0 and gb==2) or (gg==2 and gb==0): gana = 1 
@@ -125,6 +165,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += gana
     breakdown.append(("Gana", gana, 6))
     
+    # 7. BHAKOOT
     dist = (b_rashi - g_rashi) % 12
     bhakoot = 7
     if dist in [1, 11, 4, 8, 5, 7]: bhakoot = 0
@@ -132,6 +173,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += bhakoot
     breakdown.append(("Bhakoot", bhakoot, 7))
     
+    # 8. NADI
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
     nadi = 8
     if nb == ng: nadi = 0
@@ -246,7 +288,7 @@ if st.button("Calculate Match", type="primary"):
             """)
             critical_fail = True
         elif rajju_status == "Cancelled":
-            st.warning("⚠️ Sensitive Incompatibilities Neutralized (Planetary Friendship).")
+            st.warning("⚠️ Incompatibilities Detected but Neutralized (Planetary Friendship).")
             
         if not critical_fail:
             if score >= 25:
@@ -259,6 +301,39 @@ if st.button("Calculate Match", type="primary"):
         with st.expander("See Detailed Breakdown"):
             df = pd.DataFrame(breakdown, columns=["Koota", "Points", "Max"])
             st.table(df)
+
+        # --- NEW: MARRIAGE TIMING CHECK ---
+        st.divider()
+        with st.expander("🔮 Bonus: When is a Good Time for Marriage? (Transit Check)"):
+            st.markdown("""
+            This tool checks the movement of **Jupiter (Guru)**, the planet of blessings. 
+            When Jupiter moves into the **2nd, 5th, 7th, 9th, or 11th house** from your Moon Sign, it creates a "Golden Window" for marriage.
+            
+            """)
+            
+            c1, c2 = st.columns(2)
+            
+            # Predict Boy
+            with c1:
+                st.subheader("Boy's Timeline")
+                b_years = predict_marriage_luck(b_rashi)
+                for year, result, desc in b_years:
+                    if "Excellent" in result:
+                        st.success(f"**{year}:** {result}")
+                    else:
+                        st.info(f"**{year}:** {result}")
+            
+            # Predict Girl
+            with c2:
+                st.subheader("Girl's Timeline")
+                g_years = predict_marriage_luck(g_rashi)
+                for year, result, desc in g_years:
+                    if "Excellent" in result:
+                        st.success(f"**{year}:** {result}")
+                    else:
+                        st.info(f"**{year}:** {result}")
+                        
+            st.caption("Note: This is based on 'Gochar' (Planetary Transits) only. A full prediction requires Dasha analysis by an astrologer.")
             
     except Exception as e:
         st.error(f"An error occurred: {e}")
@@ -269,14 +344,20 @@ with st.expander("ℹ️ How this App Works"):
     st.markdown("""
     This app uses a smart **Hybrid Logic** combining the best of both traditions:
 
-    1.  **First, it acts like a South Indian Astrologer:**
-        * It checks for specific star alignments that are traditionally considered essential (body compatibility and energetic harmony).
-        * If a sensitive pattern is found, it will advise professional consultation rather than giving a score immediately.
+    1.  **First, it acts like a South Indian Astrologer (The Safety Check):**
+        * It checks for specific star alignments called **Rajju** (Body Compatibility).
+        * Imagine the stars mapped to a human body. Traditionally, if both partners belong to the same body part (e.g., both are "Head"), it creates an energetic imbalance.
         * 
+        * If such a pattern is found, the app advises professional consultation to check for exceptions.
         
-    2.  **Then, it acts like a North Indian Astrologer:**
-        * If the safety checks pass (or are neutral), it calculates the **36 Gunas (Ashta Koota)**.
-        * It gives you a graded score (**Excellent / Good / Average**) based on psychological and physical compatibility.
+    2.  **Then, it acts like a North Indian Astrologer (The Scoring):**
+        * If the safety checks pass, it calculates the **36 Gunas (Ashta Koota)**.
+        * This scores compatibility across 8 areas, ranging from spiritual (Varna) to biological (Nadi).
+        * 
+        * **Final Score:**
+            * **25+:** Excellent
+            * **18-24:** Good
+            * **Below 18:** Not Recommended
     """)
 
 with st.expander("⚖️ Disclaimer"):
