@@ -66,7 +66,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v10", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v11", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -129,25 +129,18 @@ def predict_marriage_luck_years(rashi_idx):
             predictions.append((year, "Neutral Year", "Jupiter in House " + str(house)))
     return predictions
 
-def predict_lucky_months(rashi_idx):
-    lucky_houses = [5, 7, 9, 11]
-    months = []
-    for h in lucky_houses:
-        target_rashi = (rashi_idx + h - 1) % 12
-        date_range = SUN_TRANSIT_DATES[target_rashi]
-        reason = ""
-        if h == 5: reason = "❤️ Romance & Love"
-        elif h == 7: reason = "💍 Partnership Focus"
-        elif h == 9: reason = "🍀 Luck & Blessings"
-        elif h == 11: reason = "💰 Gains & Fulfillment"
-        months.append((date_range, reason))
-    return months
+def predict_wedding_month(rashi_idx):
+    # Only check House 7 (Partnership/Marriage)
+    h = 7
+    target_rashi = (rashi_idx + h - 1) % 12
+    date_range = SUN_TRANSIT_DATES[target_rashi]
+    return date_range
 
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0
     breakdown = []
     
-    # Calculations
+    # Standard Calculations
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     score += varna
     breakdown.append(("Varna", varna, 1))
@@ -188,7 +181,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += nadi
     breakdown.append(("Nadi", nadi, 8))
     
-    # Safety Checks
+    # Checks
     rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
@@ -213,18 +206,21 @@ st.markdown("Calculate compatibility using Ashta Koota (36 Points) + South India
 mode = st.radio("Choose Input Mode:", ["Use Birth Details", "Direct Star Entry"], horizontal=True)
 
 if mode == "Use Birth Details":
+    st.info("ℹ️ Note: You can type specific minutes (e.g., 10:13) in the Time box if not found in the dropdown.")
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Boy Details")
         b_date = st.date_input("Boy Date", datetime.date(1995, 1, 1))
-        b_time = st.time_input("Boy Time", datetime.time(10, 0))
+        # step=60 allows minute selection
+        b_time = st.time_input("Boy Time", datetime.time(10, 0), step=60)
         b_city = st.text_input("Boy City", "Hyderabad")
         b_country = st.text_input("Boy Country", "India")
         b_tz = st.number_input("Boy Backup TZ", 5.5)
     with c2:
         st.subheader("Girl Details")
         g_date = st.date_input("Girl Date", datetime.date(1994, 11, 28))
-        g_time = st.time_input("Girl Time", datetime.time(7, 30))
+        # step=60 allows minute selection
+        g_time = st.time_input("Girl Time", datetime.time(7, 30), step=60)
         g_city = st.text_input("Girl City", "Hyderabad")
         g_country = st.text_input("Girl Country", "India")
         g_tz = st.number_input("Girl Backup TZ", 5.5)
@@ -288,7 +284,7 @@ if st.button("Calculate Match", type="primary"):
             """)
             critical_fail = True
         elif rajju_status == "Cancelled":
-            st.warning("⚠️ Incompatibilities Detected but Likely Neutralized (Planetary Friendship).")
+            st.warning("⚠️ Incompatibilities Detected but Neutralized (Planetary Friendship).")
             
         if not critical_fail:
             if score >= 25:
@@ -304,7 +300,7 @@ if st.button("Calculate Match", type="primary"):
 
         # --- PREDICTIVE TIMING ---
         st.divider()
-        with st.expander("🔮 Bonus: Marriage Timing & Lucky Months"):
+        with st.expander("🔮 Bonus: Marriage Timing & Wedding Months"):
             st.markdown("### 1. Favorable Years (Jupiter Transit)")
             st.markdown("Jupiter's position for the next 3 years. Lucky houses: 2, 5, 7, 9, 11.")
             st.caption("")
@@ -324,20 +320,19 @@ if st.button("Calculate Match", type="primary"):
                     st.markdown(f"- **{year}:** :{color}[{result}]")
 
             st.markdown("---")
-            st.markdown("### 2. Best Months (Sun Transit)")
-            st.caption("These are the windows every year where the Sun activates your relationship or luck sectors.")
+            st.markdown("### 2. Best Wedding Month (Sun Transit)")
+            st.caption("The 30-day window each year when the Sun is in your 7th House (Marriage Sector), making it ideal for weddings.")
             
             mc1, mc2 = st.columns(2)
             with mc1:
-                st.markdown("**Boy's Lucky Months:**")
-                b_months = predict_lucky_months(b_rashi)
-                for date_rng, reason in b_months:
-                    st.markdown(f"- **{date_rng}:** {reason}")
+                st.markdown("**Boy's Best Month:**")
+                b_month = predict_wedding_month(b_rashi)
+                st.markdown(f"💍 **{b_month}** (Every Year)")
+
             with mc2:
-                st.markdown("**Girl's Lucky Months:**")
-                g_months = predict_lucky_months(g_rashi)
-                for date_rng, reason in g_months:
-                    st.markdown(f"- **{date_rng}:** {reason}")
+                st.markdown("**Girl's Best Month:**")
+                g_month = predict_wedding_month(g_rashi)
+                st.markdown(f"💍 **{g_month}** (Every Year)")
             
     except Exception as e:
         st.error(f"An error occurred: {e}")
