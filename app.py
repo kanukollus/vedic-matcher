@@ -49,7 +49,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v2", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v3", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -159,7 +159,6 @@ if mode == "Use Birth Details":
         st.subheader("Boy Details")
         b_date = st.date_input("Boy Date", datetime.date(1995, 1, 1))
         b_time = st.time_input("Boy Time", datetime.time(10, 0))
-        # UPDATED DEFAULTS FOR BOY
         b_city = st.text_input("Boy City", "Hyderabad")
         b_country = st.text_input("Boy Country", "India")
         b_tz = st.number_input("Boy Backup TZ", 5.5)
@@ -176,7 +175,6 @@ elif mode == "Direct Star Entry":
     with c1:
         st.subheader("Boy Details")
         b_star = st.selectbox("Boy Star", NAKSHATRAS, index=0)
-        # Smart Rashi Logic Boy
         b_idx = NAKSHATRAS.index(b_star)
         b_poss = NAK_TO_RASHI_MAP[b_idx]
         b_opts = [RASHIS[i] for i in b_poss]
@@ -184,16 +182,14 @@ elif mode == "Direct Star Entry":
     with c2:
         st.subheader("Girl Details")
         g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11) # Uttara Phalguni
-        # Smart Rashi Logic Girl (Default to Kanya if available)
         g_idx = NAKSHATRAS.index(g_star)
         g_poss = NAK_TO_RASHI_MAP[g_idx]
         g_opts = [RASHIS[i] for i in g_poss]
         
-        # Check if Kanya is in the list and make it default
+        # Default Kanya
         kanya_default = 0
         if "Virgo (Kanya)" in g_opts:
             kanya_default = g_opts.index("Virgo (Kanya)")
-            
         g_rashi_sel = st.selectbox("Girl Rashi", g_opts, index=kanya_default)
 
 if st.button("Calculate Match", type="primary"):
@@ -224,11 +220,9 @@ if st.button("Calculate Match", type="primary"):
         col1.info(f"**Boy:** {NAKSHATRAS[b_nak]} | {RASHIS[b_rashi]}")
         col2.info(f"**Girl:** {NAKSHATRAS[g_nak]} | {RASHIS[g_rashi]}")
         
-        # Display Score
         st.subheader(f"Score: {score} / 36")
         st.progress(score/36)
         
-        # Verdict
         if rajju_fail:
             st.error("❌ DO NOT PROCEED: Critical Rajju Dosha Detected.")
         elif vedha_fail:
@@ -247,3 +241,31 @@ if st.button("Calculate Match", type="primary"):
             
     except Exception as e:
         st.error(f"An error occurred: {e}")
+
+# --- HOW IT WORKS & DISCLAIMER ---
+st.divider()
+with st.expander("ℹ️ How this App Works"):
+    st.markdown("""
+    This app uses a **Hybrid Vedic System** to ensure the most accurate compatibility check:
+    
+    1.  **Step 1: The Safety Check (South Indian System)**
+        * It first checks for **Rajju Dosha** (Body Compatibility) and **Vedha Dosha** (Energetic Conflict).
+        * 
+        * If either of these "Deal Breakers" is found, the app will advise you **NOT** to proceed, regardless of the score.
+        
+    2.  **Step 2: The Scoring (North Indian System)**
+        * If the safety checks pass, it calculates a score out of **36 Points** (Ashta Koota).
+        * This checks 8 factors including **Mental Compatibility (Maitri)**, **Emotional Harmony (Bhakoot)**, and **Health (Nadi)**.
+        
+    **Verdict Guide:**
+    * **Excellent:** Score 25+ (No Doshas)
+    * **Good:** Score 18-24 (No Doshas)
+    * **Risky:** Score below 18
+    """)
+
+with st.expander("⚖️ Disclaimer"):
+    st.caption("""
+    **For Informational Purposes Only.** This application calculates compatibility based on standard astrological algorithms (Lahiri Ayanamsa). 
+    However, astrology is a complex field with many schools of thought. A computer program cannot replace the intuition and detailed analysis of a qualified human astrologer. 
+    Do not make major life decisions solely based on this tool. The developer assumes no liability for decisions made using this app.
+    """)
