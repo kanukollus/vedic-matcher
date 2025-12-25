@@ -49,7 +49,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v3", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v4", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -246,22 +246,17 @@ if st.button("Calculate Match", type="primary"):
 st.divider()
 with st.expander("ℹ️ How this App Works"):
     st.markdown("""
-    This app uses a **Hybrid Vedic System** to ensure the most accurate compatibility check:
-    
-    1.  **Step 1: The Safety Check (South Indian System)**
-        * It first checks for **Rajju Dosha** (Body Compatibility) and **Vedha Dosha** (Energetic Conflict).
-        * 
-        * If either of these "Deal Breakers" is found, the app will advise you **NOT** to proceed, regardless of the score.
+    This app uses a smart **Hybrid Logic** combining the best of both traditions:
+
+    1.  **First, it acts like a South Indian Astrologer:**
+        * It checks for **Rajju Dosha** (Body Compatibility) and **Vedha Dosha** (Energetic Conflict).
+        * If these are bad, it **stops you immediately** with a "Do Not Proceed" warning.
         
-    2.  **Step 2: The Scoring (North Indian System)**
-        * If the safety checks pass, it calculates a score out of **36 Points** (Ashta Koota).
-        * This checks 8 factors including **Mental Compatibility (Maitri)**, **Emotional Harmony (Bhakoot)**, and **Health (Nadi)**.
-        
-    **Verdict Guide:**
-    * **Excellent:** Score 25+ (No Doshas)
-    * **Good:** Score 18-24 (No Doshas)
-    * **Risky:** Score below 18
+    2.  **Then, it acts like a North Indian Astrologer:**
+        * If the safety checks pass, it calculates the **36 Gunas (Ashta Koota)**.
+        * It gives you a graded score (**Excellent / Good / Average**) based on psychological and physical compatibility.
     """)
+    
 
 with st.expander("⚖️ Disclaimer"):
     st.caption("""
