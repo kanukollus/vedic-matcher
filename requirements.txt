@@ -2,5 +2,5 @@ streamlit
 ephem
 geopy
 timezonefinder
-pytz
 pandas
+plotly
