@@ -63,7 +63,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v13_gentle", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v14_final", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -369,11 +369,12 @@ if st.button("Calculate Match", type="primary"):
                     st.markdown(f"- **{y}:** :{color}[{r}]")
 
             st.markdown("### 2. Best Wedding Month")
+            st.caption("Recurring annually based on Sun's position in the 7th House.")
             mc1, mc2 = st.columns(2)
             with mc1:
-                st.markdown(f"**Boy:** 💍 {predict_wedding_month(b_rashi)}")
+                st.markdown(f"**Boy:** 💍 {predict_wedding_month(b_rashi)} (Annually)")
             with mc2:
-                st.markdown(f"**Girl:** 💍 {predict_wedding_month(g_rashi)}")
+                st.markdown(f"**Girl:** 💍 {predict_wedding_month(g_rashi)} (Annually)")
             
     except Exception as e:
         st.error(f"An error occurred: {e}")
