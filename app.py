@@ -19,6 +19,12 @@ NAKSHATRAS = [
     "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
 ]
 
+# Nakshatras allowed to marry the SAME Nakshatra (Exceptions to Nadi Dosha)
+SAME_NAKSHATRA_ALLOWED = [
+    "Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shravana", 
+    "Uttara Bhadrapada", "Revati"
+]
+
 RASHIS = [
     "Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)",
     "Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)",
@@ -57,7 +63,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v12", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v12_validated", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -127,15 +133,13 @@ def predict_wedding_month(rashi_idx):
 
 # --- ADVANCED CALCULATIONS ---
 def calculate_advanced(b_nak, g_nak):
-    # 1. Mahendra Porutham (Wealth/Attachment)
-    # Count from Girl to Boy
+    # Mahendra: Count from Girl to Boy
     count = (b_nak - g_nak) % 27 + 1
     mahendra = "Absent"
     if count in [4, 7, 10, 13, 16, 19, 22, 25]:
         mahendra = "Present ✅"
     
-    # 2. Stree Deergha (Distance/Wellbeing)
-    # Distance from Girl to Boy
+    # Stree Deergha: Distance from Girl to Boy
     dist = (b_nak - g_nak) % 27
     stree_deergha = "Weak"
     if dist > 13:
@@ -149,20 +153,34 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0
     breakdown = []
     
-    # 36 Point Logic
+    # 1. Varna (1)
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     score += varna
     breakdown.append(("Varna", varna, 1))
     
-    vashya = 2 if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi] else 0.5
+    # 2. Vashya (2) - Simplified to Integer logic for cleaner display
+    vashya = 0
+    if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]:
+        vashya = 2
+    elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or \
+         (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0):
+        vashya = 1 # Manav/Rakshasa semi-compatible
+    else:
+        vashya = 0 # Mismatch
+        # Note: Previous code gave 0.5, rounding down to 0 for cleaner UI or kept as 0.5 
+        # For this version, let's allow 0.5 but format display later.
+        if VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: vashya = 0.5 
+
     score += vashya
     breakdown.append(("Vashya", vashya, 2))
     
+    # 3. Tara (3)
     count = (b_nak - g_nak) % 27 + 1
     tara = 3 if count % 9 not in [3, 5, 7] else 0 
     score += tara
     breakdown.append(("Tara", tara, 3))
     
+    # 4. Yoni (4)
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
     if id_b == id_g: yoni = 4
     elif YONI_Enemy_Map[id_b] == id_g or YONI_Enemy_Map[id_g] == id_b: yoni = 0
@@ -170,11 +188,13 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += yoni
     breakdown.append(("Yoni", yoni, 4))
     
+    # 5. Maitri (5)
     lb, lg = RASHI_LORDS[b_rashi], RASHI_LORDS[g_rashi]
     maitri = MAITRI_TABLE[lb][lg]
     score += maitri
     breakdown.append(("Maitri", maitri, 5))
     
+    # 6. Gana (6)
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     if gb == gg: gana = 6
     elif (gg==0 and gb==2) or (gg==2 and gb==0): gana = 1 
@@ -183,6 +203,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += gana
     breakdown.append(("Gana", gana, 6))
     
+    # 7. Bhakoot (7)
     dist = (b_rashi - g_rashi) % 12
     bhakoot = 7
     if dist in [1, 11, 4, 8, 5, 7]: bhakoot = 0
@@ -190,19 +211,29 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += bhakoot
     breakdown.append(("Bhakoot", bhakoot, 7))
     
+    # 8. Nadi (8) - STRICT LOGIC REVALIDATED
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
     nadi = 8
-    # Nadi Logic with Cancellation
-    nadi_status_msg = "OK"
+    nadi_msg = "OK"
+    
     if nb == ng: 
         nadi = 0
-        nadi_status_msg = "Dosha"
-    
-    # Nadi Cancellation Check: Same Rashi OR Friends
-    if nadi == 0:
-        if b_rashi == g_rashi or maitri >= 4:
-            nadi = 8 # Give points back or consider neutral
-            nadi_status_msg = "Cancelled (Valid)"
+        nadi_msg = "Dosha (0 Pts)"
+        
+        # Exception 1: Allowed Same Nakshatras
+        if b_nak == g_nak:
+            if NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED:
+                nadi = 8
+                nadi_msg = "Exception: Allowed Star"
+            else:
+                nadi = 0
+                nadi_msg = "Dosha (Same Star)"
+        
+        # Exception 2: Different Nakshatra but same Rashi OR Friend Lords
+        # This only applies if Nakshatras are DIFFERENT. 
+        elif b_rashi == g_rashi or maitri >= 4:
+            nadi = 8
+            nadi_msg = "Cancelled (Friend/Rashi)"
             
     score += nadi
     breakdown.append(("Nadi", nadi, 8))
@@ -223,7 +254,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     if vedha_pairs.get(g_nak) == b_nak:
         vedha_status = "Fail"
         
-    return score, breakdown, rajju_status, vedha_status, nadi_status_msg
+    return score, breakdown, rajju_status, vedha_status, nadi_msg
 
 # --- UI ---
 st.title("🕉️ Vedic Matcher Pro")
@@ -295,8 +326,9 @@ if st.button("Calculate Match", type="primary"):
         col1.info(f"**Boy:** {NAKSHATRAS[b_nak]} | {RASHIS[b_rashi]}")
         col2.info(f"**Girl:** {NAKSHATRAS[g_nak]} | {RASHIS[g_rashi]}")
         
-        st.subheader(f"Score: {score} / 36")
-        st.progress(score/36)
+        # Display Score (Clean Format)
+        st.subheader(f"Score: {float(score):g} / 36")
+        st.progress(min(score/36, 1.0))
         
         # Verdict
         critical_fail = False
@@ -313,9 +345,8 @@ if st.button("Calculate Match", type="primary"):
             elif score >= 18:
                 st.success("✅ GOOD MATCH")
             else:
-                # Check if Mahendra saves it
                 if mahendra == "Present ✅":
-                     st.warning("⚠️ Score is low, BUT Mahendra Porutham is Present. This indicates strong attachment/family growth potential despite low score.")
+                     st.warning("⚠️ Score is low, BUT Mahendra Porutham is Present (Strong Attachment).")
                 else:
                      st.warning("⚠️ NOT RECOMMENDED (Score too low)")
         
@@ -323,14 +354,18 @@ if st.button("Calculate Match", type="primary"):
         tab1, tab2 = st.tabs(["📊 Breakdown", "✨ Advanced Checks"])
         
         with tab1:
+            # Format dataframe to hide decimals for integers
             df = pd.DataFrame(breakdown, columns=["Koota", "Points", "Max"])
+            # Format points to remove .0 if integer
+            df['Points'] = df['Points'].apply(lambda x: f"{x:g}")
             st.table(df)
             if "Cancelled" in nadi_msg:
-                 st.caption("ℹ️ Nadi Dosha was found but Cancelled due to Friendship/Rashi rules.")
+                 st.caption(f"ℹ️ Nadi Status: {nadi_msg}")
+            elif "Exception" in nadi_msg:
+                 st.caption(f"ℹ️ Nadi Status: {nadi_msg}")
 
         with tab2:
             st.markdown("### Additional South Indian Indicators")
-            st.markdown("These checks provide deeper insight beyond the points.")
             chk_data = [
                 ("Mahendra Porutham", mahendra, "Indicates Wealth, Attachment & Progeny"),
                 ("Stree Deergha", stree_deergha, "Indicates General Wellbeing & Distance")
