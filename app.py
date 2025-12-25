@@ -1,33 +1,3 @@
-I have upgraded your app to "Vedic Matcher Pro v3.0". This is a significant leap forward in terms of professional features and visual appeal.
-
-Major Enhancements Added:
-Mars Dosha (Kuja Dosha) Check: 🔴
-
-The app now calculates the position of Mars relative to the Moon.
-
-If Mars is in the 2nd, 4th, 7th, 8th, or 12th house from the Moon, it flags a "Potential Dosha."
-
-Note: This is crucial because a high score can be negated by a severe Mars mismatch.
-
-Visual Gauge Chart: 📊
-
-Replaced the boring progress bar with a professional Speedometer Gauge (using Plotly).
-
-It visually shows if the score falls in the Red, Yellow, or Green zone.
-
-Smart Timezone Feedback: 🌍
-
-The app now explicitly tells the user: "Timezone Detected: Asia/Kolkata" so they feel confident the calculation is correct.
-
-Icons in Data Tables:
-
-Added visual icons (🧠, 🦁, 🧬) to the breakdown table for better readability.
-
-Final Ultimate Code (v3.0)
-Replace your app.py on GitHub with this code.
-
-Python
-
 import streamlit as st
 import ephem
 import datetime
@@ -92,7 +62,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v3_pro", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v3_pro_clean", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -311,7 +281,7 @@ elif mode == "Direct Star Entry":
         b_poss = NAK_TO_RASHI_MAP[b_idx]
         b_opts = [RASHIS[i] for i in b_poss]
         b_rashi_sel = st.selectbox("Boy Rashi", b_opts)
-        # Mock Mars for Direct Entry (Cannot Calculate without Date)
+        # Mock Mars for Direct Entry
         b_mars_dosha = (False, "Unknown (Need Birth Date)")
         
     with c2:
@@ -409,7 +379,6 @@ if st.button("Calculate Match", type="primary"):
             mc1, mc2 = st.columns(2)
             mc1.markdown(f"**Boy:** {predict_wedding_month(b_rashi)}")
             mc2.markdown(f"**Girl:** {predict_wedding_month(g_rashi)}")
-            
             
     except Exception as e:
         st.error(f"An error occurred: {e}")
