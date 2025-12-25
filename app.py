@@ -219,6 +219,30 @@ def calculate_advanced(b_nak, g_nak):
     elif dist > 7: stree_deergha = "Good"
     return mahendra, stree_deergha
 
+def get_jupiter_position_for_year(year):
+    dt = datetime.date(year, 7, 1)
+    obs = ephem.Observer()
+    obs.date = dt
+    jupiter = ephem.Jupiter()
+    jupiter.compute(obs)
+    ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    sidereal_long = (math.degrees(ecl.lon) - ayanamsa) % 360
+    return int(sidereal_long / 30)
+
+def predict_marriage_luck_years(rashi_idx):
+    predictions = []
+    check_years = [2025, 2026, 2027]
+    for year in check_years:
+        jup_rashi = get_jupiter_position_for_year(year)
+        diff = (jup_rashi - rashi_idx) % 12
+        house = diff + 1
+        if house in [2, 5, 7, 9, 11]:
+            predictions.append((year, "✨ Excellent Year", "Jupiter in House " + str(house)))
+        else:
+            predictions.append((year, "Neutral Year", "Jupiter in House " + str(house)))
+    return predictions
+
 def predict_wedding_month(rashi_idx):
     h = 7
     target_rashi = (rashi_idx + h - 1) % 12
@@ -255,7 +279,6 @@ st.markdown("Advanced Compatibility: Ashta Koota + South Indian Checks + Mars Do
 mode = st.radio("Choose Input Mode:", ["Use Birth Details", "Direct Star Entry"], horizontal=True)
 
 if mode == "Use Birth Details":
-    st.info("ℹ️ You can type specific minutes (e.g., 10:13) in the Time box.")
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Boy Details")
@@ -375,7 +398,25 @@ if st.button("Calculate Match", type="primary"):
             st.table(pd.DataFrame(chk_data, columns=["Factor", "Status", "Meaning"]))
 
         with tab3:
+            st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
+            st.caption("Jupiter's position in 2025, 2026, 2027. Lucky houses: 2, 5, 7, 9, 11.")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("**Boy's Lucky Years:**")
+                for y, r, d in predict_marriage_luck_years(b_rashi):
+                    color = "green" if "Excellent" in r else "grey"
+                    st.markdown(f"- **{y}:** :{color}[{r}]")
+            with c2:
+                st.markdown("**Girl's Lucky Years:**")
+                for y, r, d in predict_marriage_luck_years(g_rashi):
+                    color = "green" if "Excellent" in r else "grey"
+                    st.markdown(f"- **{y}:** :{color}[{r}]")
+            
+            st.divider()
+            
             st.markdown("### 💍 Best Wedding Month (Recurring Annually)")
+            st.caption("Recurrs annually based on Sun's position in the 7th House.")
             mc1, mc2 = st.columns(2)
             mc1.markdown(f"**Boy:** {predict_wedding_month(b_rashi)}")
             mc2.markdown(f"**Girl:** {predict_wedding_month(g_rashi)}")
