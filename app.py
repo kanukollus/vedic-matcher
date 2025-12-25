@@ -49,7 +49,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v1", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v2", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -91,7 +91,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0
     breakdown = []
     
-    # Calc Logic (Same as before)
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     score += varna
     breakdown.append(("Varna", varna, 1))
@@ -160,9 +159,10 @@ if mode == "Use Birth Details":
         st.subheader("Boy Details")
         b_date = st.date_input("Boy Date", datetime.date(1995, 1, 1))
         b_time = st.time_input("Boy Time", datetime.time(10, 0))
-        b_city = st.text_input("Boy City", "Edison")
-        b_country = st.text_input("Boy Country", "USA")
-        b_tz = st.number_input("Boy Backup TZ", -5.0)
+        # UPDATED DEFAULTS FOR BOY
+        b_city = st.text_input("Boy City", "Hyderabad")
+        b_country = st.text_input("Boy Country", "India")
+        b_tz = st.number_input("Boy Backup TZ", 5.5)
     with c2:
         st.subheader("Girl Details")
         g_date = st.date_input("Girl Date", datetime.date(1994, 11, 28))
@@ -184,11 +184,17 @@ elif mode == "Direct Star Entry":
     with c2:
         st.subheader("Girl Details")
         g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11) # Uttara Phalguni
-        # Smart Rashi Logic Girl
+        # Smart Rashi Logic Girl (Default to Kanya if available)
         g_idx = NAKSHATRAS.index(g_star)
         g_poss = NAK_TO_RASHI_MAP[g_idx]
         g_opts = [RASHIS[i] for i in g_poss]
-        g_rashi_sel = st.selectbox("Girl Rashi", g_opts)
+        
+        # Check if Kanya is in the list and make it default
+        kanya_default = 0
+        if "Virgo (Kanya)" in g_opts:
+            kanya_default = g_opts.index("Virgo (Kanya)")
+            
+        g_rashi_sel = st.selectbox("Girl Rashi", g_opts, index=kanya_default)
 
 if st.button("Calculate Match", type="primary"):
     try:
