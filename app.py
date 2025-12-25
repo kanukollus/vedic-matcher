@@ -39,7 +39,6 @@ VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
 YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
 YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
 RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
-# Friendship Table: 5=Friend, 4=Neutral/Friend, 0-1=Enemy
 MAITRI_TABLE = [
     [5, 5, 5, 4, 5, 0, 0], [5, 5, 4, 1, 4, 1, 1], [5, 4, 5, 0.5, 5, 3, 0.5],
     [4, 1, 0.5, 5, 0.5, 5, 4], [5, 4, 5, 0.5, 5, 0.5, 3], [0, 1, 3, 5, 0.5, 5, 5], [0, 1, 0.5, 4, 3, 5, 5]
@@ -50,7 +49,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_streamlit_app_v6", timeout=10)
+    return Nominatim(user_agent="vedic_streamlit_app_v7", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -92,23 +91,20 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0
     breakdown = []
     
-    # 1. VARNA
+    # Standard Calculations
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     score += varna
     breakdown.append(("Varna", varna, 1))
     
-    # 2. VASHYA
     vashya = 2 if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi] else 0.5
     score += vashya
     breakdown.append(("Vashya", vashya, 2))
     
-    # 3. TARA
     count = (b_nak - g_nak) % 27 + 1
     tara = 3 if count % 9 not in [3, 5, 7] else 0 
     score += tara
     breakdown.append(("Tara", tara, 3))
     
-    # 4. YONI
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
     if id_b == id_g: yoni = 4
     elif YONI_Enemy_Map[id_b] == id_g or YONI_Enemy_Map[id_g] == id_b: yoni = 0
@@ -116,13 +112,11 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += yoni
     breakdown.append(("Yoni", yoni, 4))
     
-    # 5. MAITRI
     lb, lg = RASHI_LORDS[b_rashi], RASHI_LORDS[g_rashi]
     maitri = MAITRI_TABLE[lb][lg]
     score += maitri
     breakdown.append(("Maitri", maitri, 5))
     
-    # 6. GANA
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     if gb == gg: gana = 6
     elif (gg==0 and gb==2) or (gg==2 and gb==0): gana = 1 
@@ -131,7 +125,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += gana
     breakdown.append(("Gana", gana, 6))
     
-    # 7. BHAKOOT
     dist = (b_rashi - g_rashi) % 12
     bhakoot = 7
     if dist in [1, 11, 4, 8, 5, 7]: bhakoot = 0
@@ -139,7 +132,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += bhakoot
     breakdown.append(("Bhakoot", bhakoot, 7))
     
-    # 8. NADI
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
     nadi = 8
     if nb == ng: nadi = 0
@@ -205,8 +197,6 @@ elif mode == "Direct Star Entry":
         g_idx = NAKSHATRAS.index(g_star)
         g_poss = NAK_TO_RASHI_MAP[g_idx]
         g_opts = [RASHIS[i] for i in g_poss]
-        
-        # Default Kanya
         kanya_default = 0
         if "Virgo (Kanya)" in g_opts:
             kanya_default = g_opts.index("Virgo (Kanya)")
@@ -243,20 +233,20 @@ if st.button("Calculate Match", type="primary"):
         st.subheader(f"Score: {score} / 36")
         st.progress(score/36)
         
-        # VERDICT LOGIC
+        # VERDICT LOGIC (GENTLE MODE)
         critical_fail = False
         
-        if rajju_status == "Fail":
-            st.error("⚠️ Compatibility Issue Detected: Rajju Dosha (Same Body Group).")
-            st.info("**Consultation Recommended:** The compatibility tool has found a Dosha (Rajju). While this is traditionally a mismatch, it is best to consult a professional astrologer who can look at the **entire birth chart** (including Lagna and 7th House strength) rather than just the Nakshatras, as there may be cancellations not visible here.")
+        if rajju_status == "Fail" or vedha_status == "Fail":
+            st.error("⚠️ **Compatibility Alignment Check Required**")
+            st.info("""
+            **Consultation Recommended:** The compatibility tool has identified a few incompatibilities. 
+            
+            This does not strictly mean "No". 
+            It is highly recommended to consult a professional astrologer who can look at the **entire birth chart** (including Lagna, 7th House, and planetary positions) to see if there are specific cancellations or other strengths that neutralize this effect.
+            """)
             critical_fail = True
         elif rajju_status == "Cancelled":
-            st.warning("⚠️ Rajju Dosha Detected but Neutralized (Planetary Friendship). Proceed with caution and verification.")
-            
-        if vedha_status == "Fail":
-            st.error("⚠️ Compatibility Issue Detected: Vedha Dosha (Mutual Enemies).")
-            st.info("**Consultation Recommended:** The compatibility tool has found a Dosha (Vedha). It is best to consult a professional astrologer who can look at the **entire birth chart** rather than just the Nakshatras to see if other factors compensate for this.")
-            critical_fail = True
+            st.warning("⚠️ Sensitive Incompatibilities Neutralized (Planetary Friendship).")
             
         if not critical_fail:
             if score >= 25:
@@ -280,12 +270,12 @@ with st.expander("ℹ️ How this App Works"):
     This app uses a smart **Hybrid Logic** combining the best of both traditions:
 
     1.  **First, it acts like a South Indian Astrologer:**
-        * It checks for **Rajju Dosha** (Body Compatibility) and **Vedha Dosha** (Energetic Conflict).
-        * **Smart Cancellation:** If Rajju Dosha is found, it checks if the Planetary Lords are friends. If they are, the Dosha is considered "Cancelled" or neutralized.
+        * It checks for specific star alignments that are traditionally considered essential (body compatibility and energetic harmony).
+        * If a sensitive pattern is found, it will advise professional consultation rather than giving a score immediately.
         * 
         
     2.  **Then, it acts like a North Indian Astrologer:**
-        * If the safety checks pass (or are cancelled), it calculates the **36 Gunas (Ashta Koota)**.
+        * If the safety checks pass (or are neutral), it calculates the **36 Gunas (Ashta Koota)**.
         * It gives you a graded score (**Excellent / Good / Average**) based on psychological and physical compatibility.
     """)
 
