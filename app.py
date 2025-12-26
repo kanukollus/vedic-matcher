@@ -461,9 +461,6 @@ if st.session_state.calculated:
     # PERSONALITY SECTION
     st.subheader("🎭 Personality & Match Profile")
     
-
-[Image of the zodiac wheel]
-
     col1, col2 = st.columns(2)
     with col1:
         st.info(f"**BOY: {res['b_nak']}**")
@@ -534,7 +531,6 @@ if st.session_state.calculated:
 
     with tab3:
         st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
-        
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Boy's Lucky Years:**")
