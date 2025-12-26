@@ -286,14 +286,16 @@ if mode == "Use Birth Details":
         b_time = st.time_input("Boy Time", datetime.time(10, 0), step=60)
         b_city = st.text_input("Boy City", "Hyderabad")
         b_country = st.text_input("Boy Country", "India")
-        b_tz = st.number_input("Boy Backup TZ", 5.5)
+        with st.expander("Advanced: Manual Timezone"):
+             b_tz = st.number_input("Boy Manual UTC Offset", 5.5, help="Only used if city not found. India=5.5, USA EST=-5.0")
     with c2:
         st.subheader("Girl Details")
         g_date = st.date_input("Girl Date", datetime.date(1994, 11, 28))
         g_time = st.time_input("Girl Time", datetime.time(7, 30), step=60)
         g_city = st.text_input("Girl City", "Hyderabad")
         g_country = st.text_input("Girl Country", "India")
-        g_tz = st.number_input("Girl Backup TZ", 5.5)
+        with st.expander("Advanced: Manual Timezone"):
+             g_tz = st.number_input("Girl Manual UTC Offset", 5.5, help="Only used if city not found. India=5.5, USA EST=-5.0")
 
 elif mode == "Direct Star Entry":
     c1, c2 = st.columns(2)
@@ -416,7 +418,7 @@ if st.button("Calculate Match", type="primary"):
             st.divider()
             
             st.markdown("### 💍 Best Wedding Month (Recurring Annually)")
-            st.caption("Recurrs annually based on Sun's position in the 7th House.")
+            st.caption("Recurring window every year based on Sun's position.")
             mc1, mc2 = st.columns(2)
             mc1.markdown(f"**Boy:** {predict_wedding_month(b_rashi)}")
             mc2.markdown(f"**Girl:** {predict_wedding_month(g_rashi)}")
