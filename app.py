@@ -22,7 +22,6 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # --- HELPERS & DATA ---
-# (Keeping data constants compact for readability)
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
@@ -50,7 +49,7 @@ NAK_TRAITS = {
 }
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v13_modular", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v14_1_defaults", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -175,6 +174,31 @@ def create_gauge(score):
     fig.update_layout(height=250, margin=dict(l=10, r=10, t=40, b=10))
     return fig
 
+def handle_ai_query(prompt, context_str):
+    """Wrapper to handle AI calls safely"""
+    try:
+        # Auto-Detect Model Logic
+        model_name = "gemini-1.5-flash"
+        try:
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    if 'flash' in m.name: model_name = m.name; break
+                    elif 'pro' in m.name: model_name = m.name
+        except: pass
+
+        model = genai.GenerativeModel(model_name)
+        
+        history = [{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I understand. I am ready to help."]}]
+        for m in st.session_state.messages:
+            role = "user" if m["role"] == "user" else "model"
+            history.append({"role": role, "parts": [m["content"]]})
+            
+        chat = model.start_chat(history=history)
+        response = chat.send_message(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error connecting to AI: {e}"
+
 # --- NAVIGATION & SIDEBAR ---
 with st.sidebar:
     st.title("🕉️ Menu")
@@ -219,18 +243,18 @@ if app_mode == "❤️ Compatibility Match":
             with st.expander("TZ"): b_tz = st.number_input("UTC Offset", 5.5, key="b_tz")
         with c2:
             st.subheader("Girl")
-            g_date = st.date_input("Date", datetime.date(1996, 1, 1), key="g_d")
-            g_time = st.time_input("Time", datetime.time(10, 0), step=60, key="g_t")
+            g_date = st.date_input("Date", datetime.date(1994, 11, 28), key="g_d")
+            g_time = st.time_input("Time", datetime.time(7, 30), step=60, key="g_t")
             g_city = st.text_input("City", "Hyderabad", key="g_c")
             g_country = st.text_input("Country", "India", key="g_co")
             with st.expander("TZ"): g_tz = st.number_input("UTC Offset", 5.5, key="g_tz")
     else:
         c1, c2 = st.columns(2)
         with c1:
-            b_star = st.selectbox("Boy Star", NAKSHATRAS, key="b_s")
+            b_star = st.selectbox("Boy Star", NAKSHATRAS, index=0, key="b_s")
             b_rashi_sel = st.selectbox("Boy Rashi", [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]], key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, key="g_s")
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_sel = st.selectbox("Girl Rashi", [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]], key="g_r")
 
     if st.button("Calculate Match", type="primary"):
@@ -326,43 +350,39 @@ elif app_mode == "🤖 AI Vedic Guru":
     if not api_key:
         st.warning("⚠️ Please enter an API Key in the Sidebar to use this feature.")
     else:
-        # Context Aware Logic
+        # Context Construction
         context_str = "You are a friendly Vedic Astrologer."
+        suggestions = ["What are common remedies?", "Explain Nadi Dosha?", "Best wedding colors?"]
+        
         if st.session_state.calculated:
             res = st.session_state.results
-            context_str += f" Context: discussing match between {res['b_nak']} and {res['g_nak']}. Score: {res['score']}. Mars: {res['b_mars'][1]} / {res['g_mars'][1]}."
+            context_str += f" Context: Match between Boy ({res['b_nak']}) & Girl ({res['g_nak']}). Score: {res['score']}. Doshas: Rajju={res['rajju']}, Vedha={res['vedha']}."
+            suggestions = ["Remedies for this match?", "Is the score good?", "Explain the Doshas here"]
             st.info(f"💡 Chatting with context of **{res['b_nak']} & {res['g_nak']}** match.")
         
+        # Suggested Chips
+        cols = st.columns(3)
+        prompt_trigger = None
+        for i, sugg in enumerate(suggestions):
+            if cols[i].button(sugg): prompt_trigger = sugg
+
         # Chat UI
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
             
-        if prompt := st.chat_input("Ex: What are remedies for Nadi Dosha?"):
+        # Handle Input (Text or Button)
+        prompt = st.chat_input("Type your question...")
+        if prompt_trigger: prompt = prompt_trigger
+        
+        if prompt:
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
-                    try:
-                        # Auto-detect model
-                        model_name = "gemini-1.5-flash"
-                        try:
-                            for m in genai.list_models():
-                                if 'generateContent' in m.supported_generation_methods:
-                                    if 'flash' in m.name: model_name = m.name; break
-                                    elif 'pro' in m.name: model_name = m.name
-                        except: pass
-                        
-                        model = genai.GenerativeModel(model_name)
-                        chat = model.start_chat(history=[
-                            {"role": "user", "parts": [context_str]},
-                            {"role": "model", "parts": ["Namaste. I am ready to help."]}
-                        ] + [{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]])
-                        
-                        response = chat.send_message(prompt)
-                        st.markdown(response.text)
-                        st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    except Exception as e: st.error(f"AI Error: {e}")
+                    response_text = handle_ai_query(prompt, context_str)
+                    st.markdown(response_text)
+                    st.session_state.messages.append({"role": "assistant", "content": response_text})
 
 # --- FOOTER ---
 st.divider()
