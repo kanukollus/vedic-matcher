@@ -41,13 +41,6 @@ with st.sidebar:
     if api_key:
         try:
             genai.configure(api_key=api_key)
-            # Optional Debugger to check available models
-            with st.expander("🛠️ Debug: Available Models"):
-                try:
-                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    st.write(models)
-                except:
-                    st.write("Could not list models.")
         except Exception as e:
             st.error(f"API Error: {e}")
 
@@ -132,7 +125,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v8_gemini_pro", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v9_auto_model", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -549,8 +542,24 @@ if st.session_state.calculated:
                 with st.chat_message("assistant"):
                     with st.spinner("Guru-ji is thinking..."):
                         try:
-                            # Use gemini-pro (Stable)
-                            model = genai.GenerativeModel('gemini-pro')
+                            # Use "Auto-Detect" logic to find a valid model
+                            # Fallback list of models to try in order
+                            model_name = "gemini-1.5-flash" # Default modern
+                            
+                            # Try dynamic check if possible
+                            try:
+                                for m in genai.list_models():
+                                    if 'generateContent' in m.supported_generation_methods:
+                                        if 'flash' in m.name:
+                                            model_name = m.name
+                                            break
+                                        elif 'pro' in m.name:
+                                            model_name = m.name
+                            except:
+                                pass # If listing fails, stick to default
+
+                            # Initialize Model
+                            model = genai.GenerativeModel(model_name)
                             
                             # Construct context
                             system_context = f"""
