@@ -49,7 +49,7 @@ NAK_TRAITS = {
 }
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v15_2_final", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v16_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -296,7 +296,6 @@ with tab_time:
         
         st.divider()
         st.subheader("Lucky Month (Sun)")
-        st.caption("")
         st.info(f"💍 **{predict_wedding_month(r_idx)}** (Recurring Annually)")
 
 # --- TAB 3: AI GURU ---
@@ -346,5 +345,22 @@ with tab_ai:
 
 # --- FOOTER ---
 st.divider()
-with st.expander("ℹ️ About & Disclaimer"):
-    st.caption("This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features powered by Google Gemini. For informational purposes only.")
+with st.expander("ℹ️ How to Read Results & Disclaimer"):
+    st.markdown("""
+    ### **1. The Score (Gunas)**
+    * **18-24:** Good Match.
+    * **25-36:** Excellent Match.
+    * **Below 18:** Not recommended without remedies.
+
+    ### **2. The Critical Checks (Doshas)**
+    
+    * **Rajju (Body):** Must be 'Pass'. Indicates physical safety.
+    * **Vedha (Enemy):** Must be 'Pass'. Indicates conflict.
+    * **Nadi (Genes):** Critical for health/lineage.
+
+    ### **3. Mars (Mangal) Dosha**
+    * Checks if Mars energy is balanced between the couple.
+    * *Note: This app automatically checks for cancellations (e.g., Mars in own house).*
+    """)
+    st.caption("----------------------------------------------------------------")
+    st.caption("⚠️ **Disclaimer:** This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features are powered by Google Gemini. Calculations are based on Lahiri Ayanamsa. This is for informational purposes only; please consult a human astrologer for final marriage decisions.")
