@@ -24,7 +24,7 @@ if "messages" not in st.session_state:
 with st.sidebar:
     st.header("🤖 AI Settings")
     
-    # 1. Check if Key exists in Secrets (For Cloud Deployment)
+    # 1. Check if Key exists in Secrets
     if "GEMINI_API_KEY" in st.secrets:
         st.success("✅ AI Enabled (Pro Mode)")
         api_key = st.secrets["GEMINI_API_KEY"]
@@ -125,7 +125,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v7_stable", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v8_gemini_flash", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -504,7 +504,7 @@ if st.session_state.calculated:
 
     with tab3:
         st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
-        
+        # [Visual: Planetary Transit Chart Placeholder]
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Boy's Lucky Years:**")
@@ -542,8 +542,8 @@ if st.session_state.calculated:
                 with st.chat_message("assistant"):
                     with st.spinner("Guru-ji is thinking..."):
                         try:
-                            # Configure model
-                            model = genai.GenerativeModel('gemini-pro')
+                            # Use the model "gemini-1.5-flash" (latest)
+                            model = genai.GenerativeModel('gemini-1.5-flash')
                             
                             # Construct context
                             system_context = f"""
@@ -582,6 +582,6 @@ st.divider()
 with st.expander("ℹ️ How this App Works"):
     st.markdown("""
     **1. South Indian Checks:** Checks **Rajju** (Body Compatibility) & **Vedha**. 
-    **2. Score:** 36 Point system. 
+    **2. Score:** 36 Point system.
     **3. Mars Check:** Checks Mars position from Moon.
     """)
