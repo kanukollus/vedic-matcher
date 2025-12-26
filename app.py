@@ -7,10 +7,31 @@ from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 import pandas as pd
 import plotly.graph_objects as go
-import io
+import google.generativeai as genai
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
+
+# --- SESSION STATE INITIALIZATION ---
+if "calculated" not in st.session_state:
+    st.session_state.calculated = False
+if "results" not in st.session_state:
+    st.session_state.results = {}
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# --- SIDEBAR (API KEY) ---
+with st.sidebar:
+    st.header("🤖 AI Settings")
+    api_key = st.text_input("Google Gemini API Key", type="password", help="Get free key at aistudio.google.com")
+    if not api_key:
+        st.warning("⚠️ Enter Gemini Key to enable the AI Guru.")
+    else:
+        st.success("✅ Gemini AI Enabled")
+        try:
+            genai.configure(api_key=api_key)
+        except Exception as e:
+            st.error(f"API Error: {e}")
 
 # --- DATA CONSTANTS ---
 NAKSHATRAS = [
@@ -21,7 +42,6 @@ NAKSHATRAS = [
     "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
 ]
 
-# Personality Profiles (Symbol, Animal, Key Trait)
 NAK_TRAITS = {
     0: {"Symbol": "Horse Head", "Animal": "Horse", "Trait": "Pioneer, Fast, Independent"},
     1: {"Symbol": "Yoni", "Animal": "Elephant", "Trait": "Creative, Truthful, Struggle"},
@@ -94,7 +114,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v4_pro_share", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v6_gemini", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -148,106 +168,6 @@ def check_mars_dosha_from_moon(moon_rashi, mars_long):
     if house_diff in [2, 4, 7, 8, 12]:
         return True, f"Present (House {house_diff})"
     return False, "Absent"
-
-# --- CORE CALCULATION ---
-def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
-    score = 0
-    breakdown = []
-    
-    # 1. Varna
-    varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
-    score += varna
-    breakdown.append(("🧠 Varna (Ego)", varna, 1))
-    
-    # 2. Vashya
-    vashya = 0
-    if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: vashya = 2
-    elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or \
-         (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): vashya = 1 
-    elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: vashya = 0.5 
-    score += vashya
-    breakdown.append(("🧲 Vashya (Attraction)", vashya, 2))
-    
-    # 3. Tara
-    count = (b_nak - g_nak) % 27 + 1
-    tara = 3 if count % 9 not in [3, 5, 7] else 0 
-    score += tara
-    breakdown.append(("✨ Tara (Destiny)", tara, 3))
-    
-    # 4. Yoni
-    id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
-    if id_b == id_g: yoni = 4
-    elif YONI_Enemy_Map[id_b] == id_g or YONI_Enemy_Map[id_g] == id_b: yoni = 0
-    else: yoni = 2 
-    score += yoni
-    breakdown.append(("🦁 Yoni (Intimacy)", yoni, 4))
-    
-    # 5. Maitri
-    lb, lg = RASHI_LORDS[b_rashi], RASHI_LORDS[g_rashi]
-    maitri = MAITRI_TABLE[lb][lg]
-    score += maitri
-    breakdown.append(("🤝 Maitri (Friendship)", maitri, 5))
-    
-    # 6. Gana
-    gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
-    if gb == gg: gana = 6
-    elif (gg==0 and gb==2) or (gg==2 and gb==0): gana = 1 
-    elif (gg==1 and gb==2) or (gg==2 and gb==1): gana = 0 
-    else: gana = 5 
-    score += gana
-    breakdown.append(("🎭 Gana (Temperament)", gana, 6))
-    
-    # 7. Bhakoot
-    dist = (b_rashi - g_rashi) % 12
-    bhakoot = 7
-    if dist in [1, 11, 4, 8, 5, 7]: bhakoot = 0
-    if bhakoot == 0 and maitri >= 4: bhakoot = 7 
-    score += bhakoot
-    breakdown.append(("💘 Bhakoot (Love)", bhakoot, 7))
-    
-    # 8. Nadi
-    nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
-    nadi = 8
-    nadi_msg = "OK"
-    if nb == ng: 
-        nadi = 0
-        nadi_msg = "Dosha (0 Pts)"
-        if b_nak == g_nak:
-            if NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED:
-                nadi = 8; nadi_msg = "Exception: Allowed Star"
-            else:
-                nadi = 0; nadi_msg = "Dosha (Same Star)"
-        elif b_rashi == g_rashi or maitri >= 4:
-            nadi = 8; nadi_msg = "Cancelled (Friend/Rashi)"
-            
-    score += nadi
-    breakdown.append(("🧬 Nadi (Health)", nadi, 8))
-    
-    # Safety Checks
-    rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
-    vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
-    for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
-
-    rajju_status = "Pass"
-    if rajju_group[b_nak] == rajju_group[g_nak]:
-        if maitri >= 4 or b_rashi == g_rashi: rajju_status = "Cancelled"
-        else: rajju_status = "Fail"
-
-    vedha_status = "Pass"
-    if vedha_pairs.get(g_nak) == b_nak: vedha_status = "Fail"
-        
-    return score, breakdown, rajju_status, vedha_status, nadi_msg
-
-# --- BONUS CALCULATIONS ---
-def calculate_advanced(b_nak, g_nak):
-    count = (b_nak - g_nak) % 27 + 1
-    mahendra = "Standard (Neutral)"
-    if count in [4, 7, 10, 13, 16, 19, 22, 25]: mahendra = "Present ✅"
-    dist = (b_nak - g_nak) % 27
-    stree_deergha = "Average (Neutral)"
-    if dist > 13: stree_deergha = "Excellent ✅"
-    elif dist > 7: stree_deergha = "Good"
-    return mahendra, stree_deergha
 
 def get_jupiter_position_for_year(year):
     dt = datetime.date(year, 7, 1)
@@ -313,25 +233,101 @@ def create_report_text(boy_name, girl_name, score, rajju, vedha, b_prof, g_prof)
     ----------------------------------------
     FINAL SCORE: {score} / 36
     ----------------------------------------
-    
-    CRITICAL CHECKS:
-    - Rajju Dosha (Body): {rajju}
-    - Vedha Dosha (Enemies): {vedha}
-    
-    VERDICT:
     """
-    if score >= 25 and rajju != "Fail":
-        txt += "EXCELLENT MATCH (Highly Recommended)"
-    elif score >= 18 and rajju != "Fail":
-        txt += "GOOD MATCH (Proceed)"
-    else:
-        txt += "NOT RECOMMENDED / CONSULT ASTROLOGER"
-        
     return txt
+
+def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
+    score = 0
+    breakdown = []
+    
+    varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
+    score += varna
+    breakdown.append(("🧠 Varna (Ego)", varna, 1))
+    
+    vashya = 0
+    if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: vashya = 2
+    elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or \
+         (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): vashya = 1 
+    elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: vashya = 0.5 
+    score += vashya
+    breakdown.append(("🧲 Vashya (Attraction)", vashya, 2))
+    
+    count = (b_nak - g_nak) % 27 + 1
+    tara = 3 if count % 9 not in [3, 5, 7] else 0 
+    score += tara
+    breakdown.append(("✨ Tara (Destiny)", tara, 3))
+    
+    id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
+    if id_b == id_g: yoni = 4
+    elif YONI_Enemy_Map[id_b] == id_g or YONI_Enemy_Map[id_g] == id_b: yoni = 0
+    else: yoni = 2 
+    score += yoni
+    breakdown.append(("🦁 Yoni (Intimacy)", yoni, 4))
+    
+    lb, lg = RASHI_LORDS[b_rashi], RASHI_LORDS[g_rashi]
+    maitri = MAITRI_TABLE[lb][lg]
+    score += maitri
+    breakdown.append(("🤝 Maitri (Friendship)", maitri, 5))
+    
+    gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
+    if gb == gg: gana = 6
+    elif (gg==0 and gb==2) or (gg==2 and gb==0): gana = 1 
+    elif (gg==1 and gb==2) or (gg==2 and gb==1): gana = 0 
+    else: gana = 5 
+    score += gana
+    breakdown.append(("🎭 Gana (Temperament)", gana, 6))
+    
+    dist = (b_rashi - g_rashi) % 12
+    bhakoot = 7
+    if dist in [1, 11, 4, 8, 5, 7]: bhakoot = 0
+    if bhakoot == 0 and maitri >= 4: bhakoot = 7 
+    score += bhakoot
+    breakdown.append(("💘 Bhakoot (Love)", bhakoot, 7))
+    
+    nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
+    nadi = 8
+    nadi_msg = "OK"
+    if nb == ng: 
+        nadi = 0
+        nadi_msg = "Dosha (0 Pts)"
+        if b_nak == g_nak:
+            if NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED:
+                nadi = 8; nadi_msg = "Exception: Allowed Star"
+            else:
+                nadi = 0; nadi_msg = "Dosha (Same Star)"
+        elif b_rashi == g_rashi or maitri >= 4:
+            nadi = 8; nadi_msg = "Cancelled (Friend/Rashi)"
+            
+    score += nadi
+    breakdown.append(("🧬 Nadi (Health)", nadi, 8))
+    
+    rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
+    vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
+    for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
+
+    rajju_status = "Pass"
+    if rajju_group[b_nak] == rajju_group[g_nak]:
+        if maitri >= 4 or b_rashi == g_rashi: rajju_status = "Cancelled"
+        else: rajju_status = "Fail"
+
+    vedha_status = "Pass"
+    if vedha_pairs.get(g_nak) == b_nak: vedha_status = "Fail"
+        
+    return score, breakdown, rajju_status, vedha_status, nadi_msg
+
+def calculate_advanced(b_nak, g_nak):
+    count = (b_nak - g_nak) % 27 + 1
+    mahendra = "Standard (Neutral)"
+    if count in [4, 7, 10, 13, 16, 19, 22, 25]: mahendra = "Present ✅"
+    dist = (b_nak - g_nak) % 27
+    stree_deergha = "Average (Neutral)"
+    if dist > 13: stree_deergha = "Excellent ✅"
+    elif dist > 7: stree_deergha = "Good"
+    return mahendra, stree_deergha
 
 # --- UI ---
 st.title("🕉️ Vedic Matcher Pro")
-st.markdown("Advanced Compatibility: Ashta Koota + South Indian Checks + Mars Dosha.")
+st.markdown("Advanced Compatibility: Ashta Koota + South Indian Checks + AI Wedding Guru.")
 
 mode = st.radio("Choose Input Mode:", ["Use Birth Details", "Direct Star Entry"], horizontal=True)
 
@@ -403,98 +399,179 @@ if st.button("Calculate Match", type="primary"):
         # PROFILES
         b_prof = NAK_TRAITS.get(b_nak, {"Symbol":"-", "Animal":"-", "Trait":"-"})
         g_prof = NAK_TRAITS.get(g_nak, {"Symbol":"-", "Animal":"-", "Trait":"-"})
+
+        # SAVE TO SESSION
+        st.session_state.results = {
+            "score": score,
+            "b_nak": NAKSHATRAS[b_nak],
+            "g_nak": NAKSHATRAS[g_nak],
+            "b_rashi": RASHIS[b_rashi],
+            "g_rashi": RASHIS[g_rashi],
+            "rajju": rajju_status,
+            "vedha": vedha_status,
+            "breakdown": breakdown,
+            "nadi_msg": nadi_msg,
+            "b_mars": b_mars_dosha,
+            "g_mars": g_mars_dosha,
+            "mahendra": mahendra,
+            "stree": stree_deergha,
+            "b_prof": b_prof,
+            "g_prof": g_prof,
+            "b_rashi_idx": b_rashi,
+            "g_rashi_idx": g_rashi
+        }
+        st.session_state.calculated = True
         
-        st.divider()
-        
-        # PERSONALITY SECTION
-        st.subheader("🎭 Personality & Match Profile")
-        
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
+# --- DISPLAY RESULTS (PERSISTENT) ---
+if st.session_state.calculated:
+    res = st.session_state.results
+    
+    st.divider()
+    
+    # PERSONALITY SECTION
+    st.subheader("🎭 Personality & Match Profile")
+    
 
 [Image of the zodiac wheel]
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.info(f"**BOY: {NAKSHATRAS[b_nak]}**")
-            st.markdown(f"**Symbol:** {b_prof['Symbol']}")
-            st.markdown(f"**Animal:** {b_prof['Animal']}")
-            st.markdown(f"**Key Trait:** *{b_prof['Trait']}*")
-        with col2:
-            st.info(f"**GIRL: {NAKSHATRAS[g_nak]}**")
-            st.markdown(f"**Symbol:** {g_prof['Symbol']}")
-            st.markdown(f"**Animal:** {g_prof['Animal']}")
-            st.markdown(f"**Key Trait:** *{g_prof['Trait']}*")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info(f"**BOY: {res['b_nak']}**")
+        st.markdown(f"**Symbol:** {res['b_prof']['Symbol']}")
+        st.markdown(f"**Animal:** {res['b_prof']['Animal']}")
+        st.markdown(f"**Key Trait:** *{res['b_prof']['Trait']}*")
+    with col2:
+        st.info(f"**GIRL: {res['g_nak']}**")
+        st.markdown(f"**Symbol:** {res['g_prof']['Symbol']}")
+        st.markdown(f"**Animal:** {res['g_prof']['Animal']}")
+        st.markdown(f"**Key Trait:** *{res['g_prof']['Trait']}*")
 
-        # DOWNLOAD BUTTON
-        report_str = create_report_text(f"{NAKSHATRAS[b_nak]}", f"{NAKSHATRAS[g_nak]}", score, rajju_status, vedha_status, b_prof, g_prof)
-        st.download_button("📥 Download Match Report", report_str, file_name="Vedic_Match_Report.txt")
+    # DOWNLOAD
+    report_str = create_report_text(res['b_nak'], res['g_nak'], res['score'], res['rajju'], res['vedha'], res['b_prof'], res['g_prof'])
+    st.download_button("📥 Download Match Report", report_str, file_name="Vedic_Match_Report.txt")
 
+    st.divider()
+    
+    # SCORE GAUGE
+    st.plotly_chart(create_gauge(res['score']), use_container_width=True)
+    
+    # VERDICT
+    critical_fail = False
+    if res['rajju'] == "Fail" or res['vedha'] == "Fail":
+        st.error("⚠️ **Compatibility Alignment Check Required**")
+        st.info("Incompatibilities detected (Rajju/Vedha). Professional consultation recommended.")
+        critical_fail = True
+    elif res['rajju'] == "Cancelled":
+        st.warning("⚠️ Incompatibilities detected but neutralized (Planetary Friendship).")
+        
+    if not critical_fail:
+        if res['score'] >= 25: st.success("✅ EXCELLENT MATCH")
+        elif res['score'] >= 18: st.success("✅ GOOD MATCH")
+        else: st.warning("⚠️ NOT RECOMMENDED (Score too low)")
+    
+    # TABS
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Breakdown", "🪐 Mars & Bonus", "🔮 Timing", "💬 AI Guru"])
+    
+    with tab1:
+        df = pd.DataFrame(res['breakdown'], columns=["Koota", "Points", "Max"])
+        df['Points'] = df['Points'].apply(lambda x: f"{x:g}")
+        st.table(df)
+        if "Cancelled" in res['nadi_msg']: st.caption(f"ℹ️ Nadi Status: {res['nadi_msg']}")
+
+    with tab2:
+        st.markdown("### 🪐 Mars Dosha Check (From Moon)")
+        m_data = []
+        if res['b_mars'][0]: m_data.append(["Boy", "Possible Dosha ⚠️", res['b_mars'][1]])
+        else: m_data.append(["Boy", "No Dosha ✅", "Safe"])
+        if res['g_mars'][0]: m_data.append(["Girl", "Possible Dosha ⚠️", res['g_mars'][1]])
+        else: m_data.append(["Girl", "No Dosha ✅", "Safe"])
+        st.table(pd.DataFrame(m_data, columns=["Person", "Status", "Details"]))
+        
+        st.markdown("### ✨ Bonus Factors")
+        chk_data = [("Mahendra", res['mahendra'], "Attachment"), ("Stree Deergha", res['stree'], "Wellbeing")]
+        st.table(pd.DataFrame(chk_data, columns=["Factor", "Status", "Meaning"]))
+
+    with tab3:
+        st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Boy's Lucky Years:**")
+            for y, r, d in predict_marriage_luck_years(res['b_rashi_idx']):
+                color = "green" if "Excellent" in r else "grey"
+                st.markdown(f"- **{y}:** :{color}[{r}]")
+        with c2:
+            st.markdown("**Girl's Lucky Years:**")
+            for y, r, d in predict_marriage_luck_years(res['g_rashi_idx']):
+                color = "green" if "Excellent" in r else "grey"
+                st.markdown(f"- **{y}:** :{color}[{r}]")
+        
         st.divider()
-        
-        # SCORE GAUGE
-        st.plotly_chart(create_gauge(score), use_container_width=True)
-        
-        # VERDICT
-        critical_fail = False
-        if rajju_status == "Fail" or vedha_status == "Fail":
-            st.error("⚠️ **Compatibility Alignment Check Required**")
-            st.info("Incompatibilities detected (Rajju/Vedha). Professional consultation recommended.")
-            critical_fail = True
-        elif rajju_status == "Cancelled":
-            st.warning("⚠️ Incompatibilities detected but neutralized (Planetary Friendship).")
-            
-        if not critical_fail:
-            if score >= 25: st.success("✅ EXCELLENT MATCH")
-            elif score >= 18: st.success("✅ GOOD MATCH")
-            else: st.warning("⚠️ NOT RECOMMENDED (Score too low)")
-        
-        # TABS
-        tab1, tab2, tab3 = st.tabs(["📊 Breakdown", "🪐 Mars & Bonus", "🔮 Timing"])
-        
-        with tab1:
-            df = pd.DataFrame(breakdown, columns=["Koota", "Points", "Max"])
-            df['Points'] = df['Points'].apply(lambda x: f"{x:g}")
-            st.table(df)
-            if "Cancelled" in nadi_msg: st.caption(f"ℹ️ Nadi Status: {nadi_msg}")
+        st.markdown("### 💍 Best Wedding Month (Recurring Annually)")
+        mc1, mc2 = st.columns(2)
+        mc1.markdown(f"**Boy:** {predict_wedding_month(res['b_rashi_idx'])}")
+        mc2.markdown(f"**Girl:** {predict_wedding_month(res['g_rashi_idx'])}")
 
-        with tab2:
-            st.markdown("### 🪐 Mars Dosha Check (From Moon)")
-            st.caption("Checks if Mars is in House 2, 4, 7, 8, or 12 from the Moon. (Note: A full check requires Lagna).")
-            m_data = []
-            if b_mars_dosha[0]: m_data.append(["Boy", "Possible Dosha ⚠️", b_mars_dosha[1]])
-            else: m_data.append(["Boy", "No Dosha ✅", "Safe"])
-            if g_mars_dosha[0]: m_data.append(["Girl", "Possible Dosha ⚠️", g_mars_dosha[1]])
-            else: m_data.append(["Girl", "No Dosha ✅", "Safe"])
-            st.table(pd.DataFrame(m_data, columns=["Person", "Status", "Details"]))
-            
-            st.markdown("### ✨ Bonus Factors")
-            chk_data = [("Mahendra", mahendra, "Attachment"), ("Stree Deergha", stree_deergha, "Wellbeing")]
-            st.table(pd.DataFrame(chk_data, columns=["Factor", "Status", "Meaning"]))
+    with tab4:
+        st.markdown("### 🤖 Chat with Wedding Guru (Powered by Gemini)")
+        if not api_key:
+            st.warning("Please enter your Gemini API Key in the Sidebar to use this feature.")
+        else:
+            # Display chat history
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
 
-        with tab3:
-            st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
-            st.caption("Jupiter's position in 2025, 2026, 2027. Lucky houses: 2, 5, 7, 9, 11.")
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("**Boy's Lucky Years:**")
-                for y, r, d in predict_marriage_luck_years(b_rashi):
-                    color = "green" if "Excellent" in r else "grey"
-                    st.markdown(f"- **{y}:** :{color}[{r}]")
-            with c2:
-                st.markdown("**Girl's Lucky Years:**")
-                for y, r, d in predict_marriage_luck_years(g_rashi):
-                    color = "green" if "Excellent" in r else "grey"
-                    st.markdown(f"- **{y}:** :{color}[{r}]")
-            
-            st.divider()
-            st.markdown("### 💍 Best Wedding Month (Recurring Annually)")
-            st.caption("Recurring window every year based on Sun's position.")
-            mc1, mc2 = st.columns(2)
-            mc1.markdown(f"**Boy:** {predict_wedding_month(b_rashi)}")
-            mc2.markdown(f"**Girl:** {predict_wedding_month(g_rashi)}")
-            
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+            # Input
+            if prompt := st.chat_input("Ask about remedies, rituals, or dates..."):
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+                with st.chat_message("assistant"):
+                    with st.spinner("Guru-ji is thinking..."):
+                        try:
+                            # Configure model
+                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            
+                            # Construct context
+                            system_context = f"""
+                            You are a wise Vedic Wedding Assistant.
+                            Match Context: Boy ({res['b_nak']}, {res['b_rashi']}) & Girl ({res['g_nak']}, {res['g_rashi']}).
+                            Score: {res['score']}/36. Doshas: Rajju ({res['rajju']}), Vedha ({res['vedha']}).
+                            Traits: Boy is {res['b_prof']['Trait']}, Girl is {res['g_prof']['Trait']}.
+                            Answer concisely about rituals, remedies, and wedding planning.
+                            """
+                            
+                            # Build History for Gemini (User/Model pairs)
+                            history = []
+                            # Add system context as first user message effectively
+                            history.append({"role": "user", "parts": [system_context]})
+                            history.append({"role": "model", "parts": ["I understand. I am ready to assist with Vedic wedding advice based on this match."]})
+                            
+                            for m in st.session_state.messages:
+                                role = "user" if m["role"] == "user" else "model"
+                                history.append({"role": role, "parts": [m["content"]]})
+                                
+                            # Send to Gemini
+                            # We use the history list directly with generate_content for stateless feel or start_chat
+                            chat = model.start_chat(history=history[:-1]) # History excluding last prompt
+                            response = chat.send_message(prompt, stream=True)
+                            
+                            # Stream Output
+                            full_response = ""
+                            placeholder = st.empty()
+                            for chunk in response:
+                                full_response += chunk.text
+                                placeholder.markdown(full_response)
+                                
+                            st.session_state.messages.append({"role": "assistant", "content": full_response})
+                            
+                        except Exception as e:
+                            st.error(f"Error: {e}")
 
 # --- INFO ---
 st.divider()
