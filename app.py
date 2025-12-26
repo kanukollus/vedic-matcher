@@ -7,6 +7,7 @@ from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 import pandas as pd
 import plotly.graph_objects as go
+import io
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
@@ -19,6 +20,37 @@ NAKSHATRAS = [
     "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta",
     "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
 ]
+
+# Personality Profiles (Symbol, Animal, Key Trait)
+NAK_TRAITS = {
+    0: {"Symbol": "Horse Head", "Animal": "Horse", "Trait": "Pioneer, Fast, Independent"},
+    1: {"Symbol": "Yoni", "Animal": "Elephant", "Trait": "Creative, Truthful, Struggle"},
+    2: {"Symbol": "Blade", "Animal": "Sheep", "Trait": "Sharp, Fire, Purifier"},
+    3: {"Symbol": "Chariot", "Animal": "Serpent", "Trait": "Sensual, Nature-lover, Charismatic"},
+    4: {"Symbol": "Deer Head", "Animal": "Serpent", "Trait": "Curious, Gentle, Wanderer"},
+    5: {"Symbol": "Teardrop", "Animal": "Dog", "Trait": "Emotional, Stormy, Intellectual"},
+    6: {"Symbol": "Quiver", "Animal": "Cat", "Trait": "Nurturing, Safe, Returning"},
+    7: {"Symbol": "Flower", "Animal": "Goat", "Trait": "Spiritual, Caring, Teacher"},
+    8: {"Symbol": "Coiled Snake", "Animal": "Cat", "Trait": "Mystical, Intense, Clinging"},
+    9: {"Symbol": "Throne", "Animal": "Rat", "Trait": "Royal, Leader, Ancestral"},
+    10: {"Symbol": "Bed (Front)", "Animal": "Rat", "Trait": "Relaxed, Social, Creative"},
+    11: {"Symbol": "Bed (Back)", "Animal": "Cow", "Trait": "Helper, Friend, Patron"},
+    12: {"Symbol": "Hand", "Animal": "Buffalo", "Trait": "Skilled, Healer, Dexterous"},
+    13: {"Symbol": "Pearl", "Animal": "Tiger", "Trait": "Beautiful, Architect, Illusion"},
+    14: {"Symbol": "Shoot", "Animal": "Buffalo", "Trait": "Independent, Flexible, Traveler"},
+    15: {"Symbol": "Arch", "Animal": "Tiger", "Trait": "Goal-oriented, Focused, Competitive"},
+    16: {"Symbol": "Lotus", "Animal": "Deer", "Trait": "Friendship, Devotion, Soft"},
+    17: {"Symbol": "Umbrella", "Animal": "Deer", "Trait": "Protective, Senior, Wise"},
+    18: {"Symbol": "Roots", "Animal": "Dog", "Trait": "Investigator, Deep, Destructive"},
+    19: {"Symbol": "Fan", "Animal": "Monkey", "Trait": "Invincible, Proud, Water"},
+    20: {"Symbol": "Tusk", "Animal": "Mongoose", "Trait": "Universal, Victory, Leader"},
+    21: {"Symbol": "Ear", "Animal": "Monkey", "Trait": "Listener, Learner, Knowledge"},
+    22: {"Symbol": "Drum", "Animal": "Lion", "Trait": "Musical, Wealthy, Famous"},
+    23: {"Symbol": "Empty Circle", "Animal": "Horse", "Trait": "Healer, Philosophical, Mystery"},
+    24: {"Symbol": "Sword", "Animal": "Lion", "Trait": "Dual-faced, Passionate, Intense"},
+    25: {"Symbol": "Twins", "Animal": "Cow", "Trait": "Deep, Watery, Ascetic"},
+    26: {"Symbol": "Drum", "Animal": "Elephant", "Trait": "Wealthy, Nourisher, Complete"}
+}
 
 SAME_NAKSHATRA_ALLOWED = [
     "Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shravana", 
@@ -62,7 +94,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v3_pro_clean", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v4_pro_share", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -112,9 +144,7 @@ def get_nak_rashi(long):
 
 def check_mars_dosha_from_moon(moon_rashi, mars_long):
     mars_rashi = int(mars_long / 30)
-    # Calculate House from Moon (1-based)
     house_diff = (mars_rashi - moon_rashi) % 12 + 1
-    
     if house_diff in [2, 4, 7, 8, 12]:
         return True, f"Present (House {house_diff})"
     return False, "Absent"
@@ -256,21 +286,48 @@ def create_gauge(score):
         title = {'text': "Compatibility Score"},
         gauge = {
             'axis': {'range': [None, 36], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': "rgba(0,0,0,0)"}, # hide bar
+            'bar': {'color': "rgba(0,0,0,0)"},
             'steps': [
-                {'range': [0, 18], 'color': "#ffcccb"},  # Red
-                {'range': [18, 25], 'color': "#ffffcc"}, # Yellow
-                {'range': [25, 36], 'color': "#90ee90"}  # Green
+                {'range': [0, 18], 'color': "#ffcccb"},  
+                {'range': [18, 25], 'color': "#ffffcc"}, 
+                {'range': [25, 36], 'color': "#90ee90"} 
             ],
-            'threshold': {
-                'line': {'color': "black", 'width': 4},
-                'thickness': 0.75,
-                'value': score
-            }
+            'threshold': {'line': {'color': "black", 'width': 4}, 'thickness': 0.75, 'value': score}
         }
     ))
     fig.update_layout(height=250, margin=dict(l=10, r=10, t=40, b=10))
     return fig
+
+def create_report_text(boy_name, girl_name, score, rajju, vedha, b_prof, g_prof):
+    txt = f"""
+    VEDIC MATCHER PRO - COMPATIBILITY REPORT
+    ----------------------------------------
+    Date: {datetime.date.today()}
+    
+    BOY: {boy_name}
+    Traits: {b_prof['Symbol']} | {b_prof['Animal']} | {b_prof['Trait']}
+    
+    GIRL: {girl_name}
+    Traits: {g_prof['Symbol']} | {g_prof['Animal']} | {g_prof['Trait']}
+    
+    ----------------------------------------
+    FINAL SCORE: {score} / 36
+    ----------------------------------------
+    
+    CRITICAL CHECKS:
+    - Rajju Dosha (Body): {rajju}
+    - Vedha Dosha (Enemies): {vedha}
+    
+    VERDICT:
+    """
+    if score >= 25 and rajju != "Fail":
+        txt += "EXCELLENT MATCH (Highly Recommended)"
+    elif score >= 18 and rajju != "Fail":
+        txt += "GOOD MATCH (Proceed)"
+    else:
+        txt += "NOT RECOMMENDED / CONSULT ASTROLOGER"
+        
+    return txt
 
 # --- UI ---
 st.title("🕉️ Vedic Matcher Pro")
@@ -287,7 +344,7 @@ if mode == "Use Birth Details":
         b_city = st.text_input("Boy City", "Hyderabad")
         b_country = st.text_input("Boy Country", "India")
         with st.expander("Advanced: Manual Timezone"):
-             b_tz = st.number_input("Boy Manual UTC Offset", 5.5, help="Only used if city not found. India=5.5, USA EST=-5.0")
+             b_tz = st.number_input("Boy Manual UTC Offset", 5.5)
     with c2:
         st.subheader("Girl Details")
         g_date = st.date_input("Girl Date", datetime.date(1994, 11, 28))
@@ -295,7 +352,7 @@ if mode == "Use Birth Details":
         g_city = st.text_input("Girl City", "Hyderabad")
         g_country = st.text_input("Girl Country", "India")
         with st.expander("Advanced: Manual Timezone"):
-             g_tz = st.number_input("Girl Manual UTC Offset", 5.5, help="Only used if city not found. India=5.5, USA EST=-5.0")
+             g_tz = st.number_input("Girl Manual UTC Offset", 5.5)
 
 elif mode == "Direct Star Entry":
     c1, c2 = st.columns(2)
@@ -306,7 +363,6 @@ elif mode == "Direct Star Entry":
         b_poss = NAK_TO_RASHI_MAP[b_idx]
         b_opts = [RASHIS[i] for i in b_poss]
         b_rashi_sel = st.selectbox("Boy Rashi", b_opts)
-        # Mock Mars for Direct Entry
         b_mars_dosha = (False, "Unknown (Need Birth Date)")
         
     with c2:
@@ -327,16 +383,11 @@ if st.button("Calculate Match", type="primary"):
                 b_moon_long, b_mars_long, b_msg = get_planetary_positions(b_date, b_time, b_city, b_country, b_tz)
                 g_moon_long, g_mars_long, g_msg = get_planetary_positions(g_date, g_time, g_city, g_country, g_tz)
                 
-                if b_moon_long is None:
-                    st.error("Location error."); st.stop()
-                    
+                if b_moon_long is None: st.error("Location error."); st.stop()
                 b_nak, b_rashi = get_nak_rashi(b_moon_long)
                 g_nak, g_rashi = get_nak_rashi(g_moon_long)
-                
-                # Check Mars Dosha (Moon Based)
                 b_mars_dosha = check_mars_dosha_from_moon(b_rashi, b_mars_long)
                 g_mars_dosha = check_mars_dosha_from_moon(g_rashi, g_mars_long)
-                
                 st.success(f"Locations Found! Boy: {b_msg} | Girl: {g_msg}")
         else:
             b_nak = NAKSHATRAS.index(b_star)
@@ -349,16 +400,40 @@ if st.button("Calculate Match", type="primary"):
         score, breakdown, rajju_status, vedha_status, nadi_msg = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
         mahendra, stree_deergha = calculate_advanced(b_nak, g_nak)
         
+        # PROFILES
+        b_prof = NAK_TRAITS.get(b_nak, {"Symbol":"-", "Animal":"-", "Trait":"-"})
+        g_prof = NAK_TRAITS.get(g_nak, {"Symbol":"-", "Animal":"-", "Trait":"-"})
+        
         st.divider()
-        c1, c2, c3 = st.columns([1,1,2])
-        c1.info(f"**Boy:** {NAKSHATRAS[b_nak]} | {RASHIS[b_rashi]}")
-        c2.info(f"**Girl:** {NAKSHATRAS[g_nak]} | {RASHIS[g_rashi]}")
         
-        # GAUGE CHART
-        with c3:
-            st.plotly_chart(create_gauge(score), use_container_width=True)
+        # PERSONALITY SECTION
+        st.subheader("🎭 Personality & Match Profile")
         
-        # Verdict
+
+[Image of the zodiac wheel]
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"**BOY: {NAKSHATRAS[b_nak]}**")
+            st.markdown(f"**Symbol:** {b_prof['Symbol']}")
+            st.markdown(f"**Animal:** {b_prof['Animal']}")
+            st.markdown(f"**Key Trait:** *{b_prof['Trait']}*")
+        with col2:
+            st.info(f"**GIRL: {NAKSHATRAS[g_nak]}**")
+            st.markdown(f"**Symbol:** {g_prof['Symbol']}")
+            st.markdown(f"**Animal:** {g_prof['Animal']}")
+            st.markdown(f"**Key Trait:** *{g_prof['Trait']}*")
+
+        # DOWNLOAD BUTTON
+        report_str = create_report_text(f"{NAKSHATRAS[b_nak]}", f"{NAKSHATRAS[g_nak]}", score, rajju_status, vedha_status, b_prof, g_prof)
+        st.download_button("📥 Download Match Report", report_str, file_name="Vedic_Match_Report.txt")
+
+        st.divider()
+        
+        # SCORE GAUGE
+        st.plotly_chart(create_gauge(score), use_container_width=True)
+        
+        # VERDICT
         critical_fail = False
         if rajju_status == "Fail" or vedha_status == "Fail":
             st.error("⚠️ **Compatibility Alignment Check Required**")
@@ -384,15 +459,11 @@ if st.button("Calculate Match", type="primary"):
         with tab2:
             st.markdown("### 🪐 Mars Dosha Check (From Moon)")
             st.caption("Checks if Mars is in House 2, 4, 7, 8, or 12 from the Moon. (Note: A full check requires Lagna).")
-            
-            # Mars Status Logic
             m_data = []
             if b_mars_dosha[0]: m_data.append(["Boy", "Possible Dosha ⚠️", b_mars_dosha[1]])
             else: m_data.append(["Boy", "No Dosha ✅", "Safe"])
-            
             if g_mars_dosha[0]: m_data.append(["Girl", "Possible Dosha ⚠️", g_mars_dosha[1]])
             else: m_data.append(["Girl", "No Dosha ✅", "Safe"])
-            
             st.table(pd.DataFrame(m_data, columns=["Person", "Status", "Details"]))
             
             st.markdown("### ✨ Bonus Factors")
@@ -416,7 +487,6 @@ if st.button("Calculate Match", type="primary"):
                     st.markdown(f"- **{y}:** :{color}[{r}]")
             
             st.divider()
-            
             st.markdown("### 💍 Best Wedding Month (Recurring Annually)")
             st.caption("Recurring window every year based on Sun's position.")
             mc1, mc2 = st.columns(2)
