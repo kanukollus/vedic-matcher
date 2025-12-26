@@ -10,8 +10,8 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import io
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="wide")
+# --- PAGE CONFIG (Mobile Friendly: Centered) ---
+st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
 
 # --- SESSION STATE INITIALIZATION ---
 if "calculated" not in st.session_state:
@@ -21,7 +21,7 @@ if "results" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- HELPERS & DATA ---
+# --- DATA CONSTANTS ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
@@ -48,8 +48,9 @@ NAK_TRAITS = {
     24: {"Symbol": "Sword", "Animal": "Lion", "Trait": "Passionate"}, 25: {"Symbol": "Twins", "Animal": "Cow", "Trait": "Ascetic"}, 26: {"Symbol": "Drum", "Animal": "Elephant", "Trait": "Complete"}
 }
 
+# --- HELPERS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v14_1_defaults", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v15_mobile", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -63,7 +64,7 @@ def get_offset_smart(city, country, dt, manual_tz):
             if tz_name:
                 timezone = pytz.timezone(tz_name)
                 localized_dt = timezone.localize(dt)
-                return localized_dt.utcoffset().total_seconds() / 3600.0, f"📍 Found: {city} ({tz_name})"
+                return localized_dt.utcoffset().total_seconds() / 3600.0, f"📍 Found: {city}"
         raise ValueError
     except: return manual_tz, f"⚠️ Using Manual TZ: {manual_tz}"
 
@@ -112,31 +113,24 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0; breakdown = []
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0; score += varna
     breakdown.append(("Varna", varna, 1))
-    
     vashya = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: vashya = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): vashya = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: vashya = 0.5 
     score += vashya; breakdown.append(("Vashya", vashya, 2))
-    
     tara = 3 if ((b_nak - g_nak) % 27 + 1) % 9 not in [3, 5, 7] else 0; score += tara
     breakdown.append(("Tara", tara, 3))
-    
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
     yoni = 4 if id_b == id_g else (0 if YONI_Enemy_Map.get(id_b) == id_g or YONI_Enemy_Map.get(id_g) == id_b else 2)
     score += yoni; breakdown.append(("Yoni", yoni, 4))
-    
     maitri = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]; score += maitri
     breakdown.append(("Maitri", maitri, 5))
-    
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     gana = 6 if gb == gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else (1 if (gg==0 and gb==2) or (gg==2 and gb==0) else 5))
     score += gana; breakdown.append(("Gana", gana, 6))
-    
     dist = (b_rashi - g_rashi) % 12
     bhakoot = 7 if dist not in [1, 11, 4, 8, 5, 7] else (7 if maitri >= 4 else 0)
     score += bhakoot; breakdown.append(("Bhakoot", bhakoot, 7))
-    
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
     nadi = 8; nadi_msg = "OK"
     if nb == ng:
@@ -146,15 +140,12 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
             else: nadi_msg = "Dosha (Same Star)"
         elif b_rashi == g_rashi or maitri >= 4: nadi = 8; nadi_msg = "Cancelled (Friend/Rashi)"
     score += nadi; breakdown.append(("Nadi", nadi, 8))
-    
     rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     rajju_status = "Fail" if rajju_group[b_nak] == rajju_group[g_nak] else "Pass"
     if rajju_status == "Fail" and (maitri >= 4 or b_rashi == g_rashi): rajju_status = "Cancelled"
-    
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
     vedha_status = "Fail" if vedha_pairs.get(g_nak) == b_nak else "Pass"
-    
     return score, breakdown, rajju_status, vedha_status, nadi_msg
 
 def calculate_advanced(b_nak, g_nak):
@@ -174,10 +165,10 @@ def create_gauge(score):
     fig.update_layout(height=250, margin=dict(l=10, r=10, t=40, b=10))
     return fig
 
-def handle_ai_query(prompt, context_str):
-    """Wrapper to handle AI calls safely"""
+def handle_ai_query(prompt, context_str, key):
     try:
-        # Auto-Detect Model Logic
+        genai.configure(api_key=key)
+        # Auto-detect logic
         model_name = "gemini-1.5-flash"
         try:
             for m in genai.list_models():
@@ -185,52 +176,33 @@ def handle_ai_query(prompt, context_str):
                     if 'flash' in m.name: model_name = m.name; break
                     elif 'pro' in m.name: model_name = m.name
         except: pass
-
         model = genai.GenerativeModel(model_name)
-        
-        history = [{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I understand. I am ready to help."]}]
-        for m in st.session_state.messages:
-            role = "user" if m["role"] == "user" else "model"
-            history.append({"role": role, "parts": [m["content"]]})
-            
-        chat = model.start_chat(history=history)
+        chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I understand."]}])
         response = chat.send_message(prompt)
         return response.text
-    except Exception as e:
-        return f"Error connecting to AI: {e}"
+    except Exception as e: return f"Error: {e}"
 
-# --- NAVIGATION & SIDEBAR ---
+def create_report_text(b_n, g_n, sc, r, v, b_p, g_p):
+    return f"MATCH REPORT\nBoy: {b_n} ({b_p['Trait']})\nGirl: {g_n} ({g_p['Trait']})\nScore: {sc}/36\nRajju: {r}\nVedha: {v}"
+
+# --- MAIN LAYOUT (TABS FOR MOBILE FEEL) ---
+st.title("🕉️ Vedic Matcher Pro")
+
+# SIDEBAR (Minimal Settings)
 with st.sidebar:
-    st.title("🕉️ Menu")
-    app_mode = st.radio("Select Tool:", ["❤️ Compatibility Match", "📅 Auspicious Timing", "🤖 AI Vedic Guru"])
-    
-    st.divider()
-    if st.button("🔄 Reset / Start Over", type="primary"):
+    st.header("⚙️ Settings")
+    if st.button("🔄 Reset App", type="primary"):
         st.session_state.clear()
         st.rerun()
-    
-    st.divider()
-    st.header("🔑 AI Settings")
-    if "GEMINI_API_KEY" in st.secrets:
-        st.success("✅ Pro Mode Active")
-        api_key = st.secrets["GEMINI_API_KEY"]
-    else:
-        api_key = st.text_input("Gemini API Key", type="password", help="aistudio.google.com")
-        if api_key: st.success("✅ Key Entered")
-        else: st.warning("Required for Chat")
-    
-    if api_key: 
-        try: genai.configure(api_key=api_key)
-        except: pass
+    st.caption("Settings moved to AI tab for easier mobile access.")
 
-# ==========================================
-# PAGE 1: COMPATIBILITY MATCH (MAIN)
-# ==========================================
-if app_mode == "❤️ Compatibility Match":
-    st.title("❤️ Vedic Matcher Pro")
-    st.markdown("Comprehensive 36-point compatibility, Dosha checks, and Mars analysis.")
-    
-    input_method = st.radio("Input Method:", ["Birth Details", "Direct Star Entry"], horizontal=True)
+# TABS NAVIGATION
+tab_match, tab_time, tab_ai = st.tabs(["❤️ Match", "📅 Timing", "🤖 AI Guru"])
+
+# --- TAB 1: MATCH ---
+with tab_match:
+    st.caption("Calculate compatibility score & Doshas.")
+    input_method = st.radio("Mode:", ["Birth Details", "Direct Star Entry"], horizontal=True)
     
     if input_method == "Birth Details":
         c1, c2 = st.columns(2)
@@ -240,39 +212,37 @@ if app_mode == "❤️ Compatibility Match":
             b_time = st.time_input("Time", datetime.time(10, 0), step=60, key="b_t")
             b_city = st.text_input("City", "Hyderabad", key="b_c")
             b_country = st.text_input("Country", "India", key="b_co")
-            with st.expander("TZ"): b_tz = st.number_input("UTC Offset", 5.5, key="b_tz")
         with c2:
             st.subheader("Girl")
             g_date = st.date_input("Date", datetime.date(1994, 11, 28), key="g_d")
             g_time = st.time_input("Time", datetime.time(7, 30), step=60, key="g_t")
             g_city = st.text_input("City", "Hyderabad", key="g_c")
             g_country = st.text_input("Country", "India", key="g_co")
-            with st.expander("TZ"): g_tz = st.number_input("UTC Offset", 5.5, key="g_tz")
     else:
         c1, c2 = st.columns(2)
         with c1:
-            b_star = st.selectbox("Boy Star", NAKSHATRAS, index=0, key="b_s")
+            b_star = st.selectbox("Boy Star", NAKSHATRAS, index=0, key="b_s") # Ashwini Default
             b_rashi_sel = st.selectbox("Boy Rashi", [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]], key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # Uttara Phalguni Default (Index 11)
             g_rashi_sel = st.selectbox("Girl Rashi", [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]], key="g_r")
 
-    if st.button("Calculate Match", type="primary"):
+    if st.button("Calculate Match", type="primary", use_container_width=True):
         try:
             if input_method == "Birth Details":
-                with st.spinner("Consulting the stars..."):
-                    b_moon, b_mars_l, b_msg = get_planetary_positions(b_date, b_time, b_city, b_country, b_tz)
-                    g_moon, g_mars_l, g_msg = get_planetary_positions(g_date, g_time, g_city, g_country, g_tz)
+                with st.spinner("Analyzing stars..."):
+                    b_moon, b_mars_l, b_msg = get_planetary_positions(b_date, b_time, b_city, b_country, 5.5)
+                    g_moon, g_mars_l, g_msg = get_planetary_positions(g_date, g_time, g_city, g_country, 5.5)
                     if b_moon is None: st.error("Location Error"); st.stop()
                     b_nak, b_rashi = get_nak_rashi(b_moon)
                     g_nak, g_rashi = get_nak_rashi(g_moon)
                     b_mars = check_mars_dosha_smart(b_rashi, b_mars_l)
                     g_mars = check_mars_dosha_smart(g_rashi, g_mars_l)
-                    st.success(f"Locations: {b_msg} | {g_msg}")
+                    st.success("Planets Calculated Successfully")
             else:
                 b_nak = NAKSHATRAS.index(b_star); b_rashi = RASHIS.index(b_rashi_sel)
                 g_nak = NAKSHATRAS.index(g_star); g_rashi = RASHIS.index(g_rashi_sel)
-                b_mars = (False, "Unknown (Direct Mode)"); g_mars = (False, "Unknown")
+                b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
             score, breakdown, rajju, vedha, nadi_msg = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
             mahendra, stree, dina = calculate_advanced(b_nak, g_nak)
@@ -288,103 +258,90 @@ if app_mode == "❤️ Compatibility Match":
             st.session_state.calculated = True
         except Exception as e: st.error(f"Error: {e}")
 
-    # RESULTS DISPLAY
+    # RESULTS UI
     if st.session_state.calculated:
         res = st.session_state.results
         st.divider()
-        st.subheader(f"Score: {res['score']} / 36")
-        st.plotly_chart(create_gauge(res['score']), use_container_width=True)
+        c_res1, c_res2 = st.columns([2, 1])
+        with c_res1:
+            st.subheader(f"Score: {res['score']} / 36")
+            if res['score'] >= 18 and res['rajju'] != "Fail": st.success("✅ Good Match")
+            else: st.warning("⚠️ Review Needed")
+        with c_res2:
+            st.plotly_chart(create_gauge(res['score']), use_container_width=True)
         
-        c1, c2 = st.columns(2)
-        c1.info(f"**Boy:** {res['b_nak']} | {res['b_rashi']}")
-        c2.info(f"**Girl:** {res['g_nak']} | {res['g_rashi']}")
-        
-        tab1, tab2, tab3 = st.tabs(["📊 Data & Report", "🪐 Mars & Doshas", "✨ Bonus Factors"])
-        
-        with tab1:
-            st.table(pd.DataFrame(res['breakdown'], columns=["Koota", "Score", "Max"]))
-            csv = pd.DataFrame(res['breakdown']).to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download Data (CSV)", csv, "match_data.csv", "text/csv")
+        with st.expander("📊 Detailed Breakdown & Downloads"):
+            st.table(pd.DataFrame(res['breakdown'], columns=["Attribute", "Points", "Max"]))
+            # Downloads
+            txt_data = create_report_text(res['b_nak'], res['g_nak'], res['score'], res['rajju'], res['vedha'], res['b_prof'], res['g_prof'])
+            st.download_button("📥 Save Report (TXT)", txt_data, "report.txt")
             
-        with tab2:
-            st.write(f"**Rajju:** {res['rajju']} | **Vedha:** {res['vedha']} | **Nadi:** {res['nadi_msg']}")
-            m_data = [["Boy", res['b_mars'][1]], ["Girl", res['g_mars'][1]]]
-            st.table(pd.DataFrame(m_data, columns=["Person", "Mars Status"]))
-            
-        with tab3:
-            st.write(f"**Mahendra:** {res['mahendra']}")
-            st.write(f"**Stree Deergha:** {res['stree']}")
-            st.write(f"**Dina Porutham:** {res['dina']}")
+        with st.expander("🪐 Dosha Analysis (Mars/Rajju)"):
+            st.write(f"**Rajju:** {res['rajju']} (Body Check)")
+            st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
+            st.write(f"**Boy Mars:** {res['b_mars'][1]}")
+            st.write(f"**Girl Mars:** {res['g_mars'][1]}")
 
-# ==========================================
-# PAGE 2: AUSPICIOUS TIMING (STANDALONE)
-# ==========================================
-elif app_mode == "📅 Auspicious Timing":
-    st.title("📅 Wedding Timing Calculator")
-    st.markdown("Find the best years and months for marriage based on Rashi Transits (Jupiter & Sun).")
+# --- TAB 2: TIMING ---
+with tab_time:
+    st.header("📅 Wedding Timing")
+    st.caption("Best time based on Boy/Girl Moon Sign.")
     
-    sel_rashi = st.selectbox("Select Your Rashi (Moon Sign)", RASHIS)
-    rashi_idx = RASHIS.index(sel_rashi)
-    
-    if st.button("Check Dates", type="primary"):
+    t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
+    if st.button("Check Auspicious Dates", use_container_width=True):
+        r_idx = RASHIS.index(t_rashi)
         st.divider()
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("🔮 Lucky Years (Jupiter)")
-            st.caption("Jupiter in House 2, 5, 7, 9, 11 is excellent.")
-            for y, status in predict_marriage_luck_years(rashi_idx):
-                color = "green" if "Excellent" in status else "grey"
-                st.markdown(f"**{y}:** :{color}[{status}]")
-        with c2:
-            st.subheader("💍 Best Month (Sun)")
-            st.caption("Recurring window every year.")
-            st.info(f"**{predict_wedding_month(rashi_idx)}**")
+        st.subheader("Lucky Years (Jupiter)")
+        for y, s in predict_marriage_luck_years(r_idx):
+            icon = "✅" if "Excellent" in s else "😐"
+            st.write(f"**{y}:** {icon} {s}")
+        
+        st.divider()
+        st.subheader("Lucky Month (Sun)")
+        
+        st.info(f"💍 **{predict_wedding_month(r_idx)}** (Recurring Annually)")
 
-# ==========================================
-# PAGE 3: AI VEDIC GURU (STANDALONE)
-# ==========================================
-elif app_mode == "🤖 AI Vedic Guru":
-    st.title("🤖 Ask the Vedic Guru")
-    st.markdown("Ask anything about weddings, rituals, or compatibility.")
+# --- TAB 3: AI GURU ---
+with tab_ai:
+    st.header("🤖 Ask the Guru")
     
-    if not api_key:
-        st.warning("⚠️ Please enter an API Key in the Sidebar to use this feature.")
+    # MOBILE FRIENDLY KEY INPUT
+    user_key = None
+    if "GEMINI_API_KEY" in st.secrets:
+        user_key = st.secrets["GEMINI_API_KEY"]
     else:
-        # Context Construction
-        context_str = "You are a friendly Vedic Astrologer."
-        suggestions = ["What are common remedies?", "Explain Nadi Dosha?", "Best wedding colors?"]
+        user_key = st.text_input("🔑 Enter Gemini API Key", type="password", placeholder="Paste key here if not in sidebar")
+    
+    if not user_key:
+        st.warning("API Key needed. Get one free at aistudio.google.com")
+    else:
+        # Context
+        context = "You are a Vedic Astrologer."
+        suggestions = ["Best wedding colors?", "Remedies for Nadi Dosha?", "Explain Rajju Dosha"]
         
         if st.session_state.calculated:
-            res = st.session_state.results
-            context_str += f" Context: Match between Boy ({res['b_nak']}) & Girl ({res['g_nak']}). Score: {res['score']}. Doshas: Rajju={res['rajju']}, Vedha={res['vedha']}."
-            suggestions = ["Remedies for this match?", "Is the score good?", "Explain the Doshas here"]
-            st.info(f"💡 Chatting with context of **{res['b_nak']} & {res['g_nak']}** match.")
+            r = st.session_state.results
+            context += f" Match Context: Boy {r['b_nak']}, Girl {r['g_nak']}. Score: {r['score']}. Doshas: Rajju={r['rajju']}."
+            suggestions = ["Analyze this match score", "Remedies for this couple?", "Is Mars Dosha an issue here?"]
+            st.success(f"Context Loaded: {r['b_nak']} ❤️ {r['g_nak']}")
         
-        # Suggested Chips
+        # Suggestion Buttons
         cols = st.columns(3)
-        prompt_trigger = None
-        for i, sugg in enumerate(suggestions):
-            if cols[i].button(sugg): prompt_trigger = sugg
-
-        # Chat UI
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]): st.markdown(msg["content"])
+        clicked_prompt = None
+        for i, s in enumerate(suggestions):
+            if cols[i].button(s, use_container_width=True): clicked_prompt = s
             
-        # Handle Input (Text or Button)
-        prompt = st.chat_input("Type your question...")
-        if prompt_trigger: prompt = prompt_trigger
-        
-        if prompt:
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"): st.markdown(prompt)
+        # Chat
+        for m in st.session_state.messages:
+            with st.chat_message(m["role"]): st.write(m["content"])
+            
+        if (prompt := st.chat_input("Ask a question...")) or clicked_prompt:
+            final_prompt = prompt if prompt else clicked_prompt
+            st.session_state.messages.append({"role": "user", "content": final_prompt})
+            with st.chat_message("user"): st.write(final_prompt)
             
             with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    response_text = handle_ai_query(prompt, context_str)
-                    st.markdown(response_text)
-                    st.session_state.messages.append({"role": "assistant", "content": response_text})
-
-# --- FOOTER ---
-st.divider()
-with st.expander("ℹ️ About & Disclaimer"):
-    st.caption("This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features powered by Google Gemini. For informational purposes only.")
+                with st.spinner("Consulting texts..."):
+                    ans = handle_ai_query(final_prompt, context, user_key)
+                    st.write(ans)
+                    st.session_state.messages.append({"role": "assistant", "content": ans})
