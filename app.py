@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import io
 
-# --- PAGE CONFIG (Mobile Friendly: Centered) ---
+# --- PAGE CONFIG (Mobile Friendly) ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
 
 # --- SESSION STATE INITIALIZATION ---
@@ -21,7 +21,7 @@ if "results" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- DATA CONSTANTS ---
+# --- HELPERS & DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
@@ -48,9 +48,8 @@ NAK_TRAITS = {
     24: {"Symbol": "Sword", "Animal": "Lion", "Trait": "Passionate"}, 25: {"Symbol": "Twins", "Animal": "Cow", "Trait": "Ascetic"}, 26: {"Symbol": "Drum", "Animal": "Elephant", "Trait": "Complete"}
 }
 
-# --- HELPERS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v15_mobile", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v15_1_mobile", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -64,7 +63,7 @@ def get_offset_smart(city, country, dt, manual_tz):
             if tz_name:
                 timezone = pytz.timezone(tz_name)
                 localized_dt = timezone.localize(dt)
-                return localized_dt.utcoffset().total_seconds() / 3600.0, f"📍 Found: {city}"
+                return localized_dt.utcoffset().total_seconds() / 3600.0, f"📍 Found: {city} ({tz_name})"
         raise ValueError
     except: return manual_tz, f"⚠️ Using Manual TZ: {manual_tz}"
 
@@ -185,16 +184,14 @@ def handle_ai_query(prompt, context_str, key):
 def create_report_text(b_n, g_n, sc, r, v, b_p, g_p):
     return f"MATCH REPORT\nBoy: {b_n} ({b_p['Trait']})\nGirl: {g_n} ({g_p['Trait']})\nScore: {sc}/36\nRajju: {r}\nVedha: {v}"
 
-# --- MAIN LAYOUT (TABS FOR MOBILE FEEL) ---
-st.title("🕉️ Vedic Matcher Pro")
-
-# SIDEBAR (Minimal Settings)
-with st.sidebar:
-    st.header("⚙️ Settings")
-    if st.button("🔄 Reset App", type="primary"):
+# --- MAIN LAYOUT (MOBILE FIRST) ---
+c_title, c_reset = st.columns([3, 1])
+with c_title:
+    st.title("🕉️ Vedic Matcher")
+with c_reset:
+    if st.button("🔄 Reset", use_container_width=True):
         st.session_state.clear()
         st.rerun()
-    st.caption("Settings moved to AI tab for easier mobile access.")
 
 # TABS NAVIGATION
 tab_match, tab_time, tab_ai = st.tabs(["❤️ Match", "📅 Timing", "🤖 AI Guru"])
@@ -321,7 +318,7 @@ with tab_ai:
         
         if st.session_state.calculated:
             r = st.session_state.results
-            context += f" Match Context: Boy {r['b_nak']}, Girl {r['g_nak']}. Score: {r['score']}. Doshas: Rajju={r['rajju']}."
+            context += f" Match Context: Boy {r['b_nak']}, Girl {r['g_nak']}. Score: {r['score']}. Doshas: Rajju={r['rajju']}, Vedha={r['vedha']}."
             suggestions = ["Analyze this match score", "Remedies for this couple?", "Is Mars Dosha an issue here?"]
             st.success(f"Context Loaded: {r['b_nak']} ❤️ {r['g_nak']}")
         
@@ -345,3 +342,8 @@ with tab_ai:
                     ans = handle_ai_query(final_prompt, context, user_key)
                     st.write(ans)
                     st.session_state.messages.append({"role": "assistant", "content": ans})
+
+# --- FOOTER ---
+st.divider()
+with st.expander("ℹ️ About & Disclaimer"):
+    st.caption("This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features powered by Google Gemini. For informational purposes only.")
