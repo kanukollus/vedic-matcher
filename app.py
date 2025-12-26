@@ -8,6 +8,7 @@ from timezonefinder import TimezoneFinder
 import pandas as pd
 import plotly.graph_objects as go
 import google.generativeai as genai
+import io
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
@@ -20,29 +21,29 @@ if "results" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- SIDEBAR (API KEY LOGIC) ---
+# --- SIDEBAR (SETTINGS & RESET) ---
 with st.sidebar:
-    st.header("🤖 AI Settings")
+    st.header("⚙️ App Controls")
     
-    # 1. Check if Key exists in Secrets
+    # RESET BUTTON
+    if st.button("🔄 Reset / Start Over", type="primary"):
+        st.session_state.clear()
+        st.rerun()
+    
+    st.divider()
+    
+    st.header("🤖 AI Settings")
     if "GEMINI_API_KEY" in st.secrets:
         st.success("✅ AI Enabled (Pro Mode)")
         api_key = st.secrets["GEMINI_API_KEY"]
-    
-    # 2. If no secret found, ask user for key
     else:
         api_key = st.text_input("Google Gemini API Key", type="password", help="Get free key at aistudio.google.com")
-        if not api_key:
-            st.warning("⚠️ Enter Gemini Key to enable the AI Guru.")
-        else:
-            st.success("✅ Gemini AI Enabled")
+        if not api_key: st.warning("⚠️ Enter Gemini Key to enable the AI Guru.")
+        else: st.success("✅ Gemini AI Enabled")
 
-    # Configure Gemini
     if api_key:
-        try:
-            genai.configure(api_key=api_key)
-        except Exception as e:
-            st.error(f"API Error: {e}")
+        try: genai.configure(api_key=api_key)
+        except Exception as e: st.error(f"API Error: {e}")
 
 # --- DATA CONSTANTS ---
 NAKSHATRAS = [
@@ -125,7 +126,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v9_auto_model", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v12_csv", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -173,12 +174,20 @@ def get_planetary_positions(date_obj, time_obj, city, country, manual_tz):
 def get_nak_rashi(long):
     return int(long / 13.333333), int(long / 30)
 
-def check_mars_dosha_from_moon(moon_rashi, mars_long):
+def check_mars_dosha_smart(moon_rashi, mars_long):
     mars_rashi = int(mars_long / 30)
     house_diff = (mars_rashi - moon_rashi) % 12 + 1
-    if house_diff in [2, 4, 7, 8, 12]:
-        return True, f"Present (House {house_diff})"
-    return False, "Absent"
+    is_dosha_house = house_diff in [2, 4, 7, 8, 12]
+    status = "Safe"
+    if is_dosha_house:
+        if mars_rashi == 0 or mars_rashi == 7:
+            status = f"Neutralized (Mars in Own Sign - House {house_diff})"
+        elif mars_rashi == 9:
+            status = f"Neutralized (Mars Exalted - House {house_diff})"
+        else:
+            status = f"⚠️ Dosha Present (House {house_diff})"
+            return True, status
+    return False, status
 
 def get_jupiter_position_for_year(year):
     dt = datetime.date(year, 7, 1)
@@ -253,7 +262,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     score += varna
-    breakdown.append(("🧠 Varna (Ego)", varna, 1))
+    breakdown.append(("Varna", varna, 1))
     
     vashya = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: vashya = 2
@@ -261,24 +270,24 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
          (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): vashya = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: vashya = 0.5 
     score += vashya
-    breakdown.append(("🧲 Vashya (Attraction)", vashya, 2))
+    breakdown.append(("Vashya", vashya, 2))
     
     count = (b_nak - g_nak) % 27 + 1
     tara = 3 if count % 9 not in [3, 5, 7] else 0 
     score += tara
-    breakdown.append(("✨ Tara (Destiny)", tara, 3))
+    breakdown.append(("Tara", tara, 3))
     
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
     if id_b == id_g: yoni = 4
     elif YONI_Enemy_Map[id_b] == id_g or YONI_Enemy_Map[id_g] == id_b: yoni = 0
     else: yoni = 2 
     score += yoni
-    breakdown.append(("🦁 Yoni (Intimacy)", yoni, 4))
+    breakdown.append(("Yoni", yoni, 4))
     
     lb, lg = RASHI_LORDS[b_rashi], RASHI_LORDS[g_rashi]
     maitri = MAITRI_TABLE[lb][lg]
     score += maitri
-    breakdown.append(("🤝 Maitri (Friendship)", maitri, 5))
+    breakdown.append(("Maitri", maitri, 5))
     
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     if gb == gg: gana = 6
@@ -286,14 +295,14 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     elif (gg==1 and gb==2) or (gg==2 and gb==1): gana = 0 
     else: gana = 5 
     score += gana
-    breakdown.append(("🎭 Gana (Temperament)", gana, 6))
+    breakdown.append(("Gana", gana, 6))
     
     dist = (b_rashi - g_rashi) % 12
     bhakoot = 7
     if dist in [1, 11, 4, 8, 5, 7]: bhakoot = 0
     if bhakoot == 0 and maitri >= 4: bhakoot = 7 
     score += bhakoot
-    breakdown.append(("💘 Bhakoot (Love)", bhakoot, 7))
+    breakdown.append(("Bhakoot", bhakoot, 7))
     
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
     nadi = 8
@@ -310,7 +319,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
             nadi = 8; nadi_msg = "Cancelled (Friend/Rashi)"
             
     score += nadi
-    breakdown.append(("🧬 Nadi (Health)", nadi, 8))
+    breakdown.append(("Nadi", nadi, 8))
     
     rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
@@ -334,7 +343,10 @@ def calculate_advanced(b_nak, g_nak):
     stree_deergha = "Average (Neutral)"
     if dist > 13: stree_deergha = "Excellent ✅"
     elif dist > 7: stree_deergha = "Good"
-    return mahendra, stree_deergha
+    # Dina Porutham
+    rem = count % 9
+    dina = "Good ✅" if rem in [2, 4, 6, 8, 0] else "Average (Neutral)"
+    return mahendra, stree_deergha, dina
 
 # --- UI ---
 st.title("🕉️ Vedic Matcher Pro")
@@ -393,8 +405,11 @@ if st.button("Calculate Match", type="primary"):
                 if b_moon_long is None: st.error("Location error."); st.stop()
                 b_nak, b_rashi = get_nak_rashi(b_moon_long)
                 g_nak, g_rashi = get_nak_rashi(g_moon_long)
-                b_mars_dosha = check_mars_dosha_from_moon(b_rashi, b_mars_long)
-                g_mars_dosha = check_mars_dosha_from_moon(g_rashi, g_mars_long)
+                
+                # Check Mars Dosha (SMART MODE)
+                b_mars_dosha = check_mars_dosha_smart(b_rashi, b_mars_long)
+                g_mars_dosha = check_mars_dosha_smart(g_rashi, g_mars_long)
+                
                 st.success(f"Locations Found! Boy: {b_msg} | Girl: {g_msg}")
         else:
             b_nak = NAKSHATRAS.index(b_star)
@@ -405,7 +420,7 @@ if st.button("Calculate Match", type="primary"):
             g_mars_dosha = (False, "Unknown (Direct Mode)")
 
         score, breakdown, rajju_status, vedha_status, nadi_msg = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
-        mahendra, stree_deergha = calculate_advanced(b_nak, g_nak)
+        mahendra, stree_deergha, dina_porutham = calculate_advanced(b_nak, g_nak)
         
         # PROFILES
         b_prof = NAK_TRAITS.get(b_nak, {"Symbol":"-", "Animal":"-", "Trait":"-"})
@@ -426,6 +441,7 @@ if st.button("Calculate Match", type="primary"):
             "g_mars": g_mars_dosha,
             "mahendra": mahendra,
             "stree": stree_deergha,
+            "dina": dina_porutham,
             "b_prof": b_prof,
             "g_prof": g_prof,
             "b_rashi_idx": b_rashi,
@@ -445,6 +461,9 @@ if st.session_state.calculated:
     # PERSONALITY SECTION
     st.subheader("🎭 Personality & Match Profile")
     
+
+[Image of the zodiac wheel]
+
     col1, col2 = st.columns(2)
     with col1:
         st.info(f"**BOY: {res['b_nak']}**")
@@ -457,9 +476,15 @@ if st.session_state.calculated:
         st.markdown(f"**Animal:** {res['g_prof']['Animal']}")
         st.markdown(f"**Key Trait:** *{res['g_prof']['Trait']}*")
 
-    # DOWNLOAD
-    report_str = create_report_text(res['b_nak'], res['g_nak'], res['score'], res['rajju'], res['vedha'], res['b_prof'], res['g_prof'])
-    st.download_button("📥 Download Match Report", report_str, file_name="Vedic_Match_Report.txt")
+    # DOWNLOAD BUTTONS
+    c_dl1, c_dl2 = st.columns(2)
+    with c_dl1:
+        report_str = create_report_text(res['b_nak'], res['g_nak'], res['score'], res['rajju'], res['vedha'], res['b_prof'], res['g_prof'])
+        st.download_button("📄 Download Summary (TXT)", report_str, file_name="Vedic_Match_Report.txt")
+    with c_dl2:
+        df_csv = pd.DataFrame(res['breakdown'], columns=["Koota", "Points Obtained", "Total Points"])
+        csv = df_csv.to_csv(index=False).encode('utf-8')
+        st.download_button("📊 Download Points Table (CSV)", csv, "Vedic_Points_Table.csv", "text/csv")
 
     st.divider()
     
@@ -490,21 +515,26 @@ if st.session_state.calculated:
         if "Cancelled" in res['nadi_msg']: st.caption(f"ℹ️ Nadi Status: {res['nadi_msg']}")
 
     with tab2:
-        st.markdown("### 🪐 Mars Dosha Check (From Moon)")
+        st.markdown("### 🪐 Mars Dosha Check (Smart Logic)")
+        st.caption("Checks Mars from Moon + Cancellations (Own Sign/Exalted).")
         m_data = []
-        if res['b_mars'][0]: m_data.append(["Boy", "Possible Dosha ⚠️", res['b_mars'][1]])
-        else: m_data.append(["Boy", "No Dosha ✅", "Safe"])
-        if res['g_mars'][0]: m_data.append(["Girl", "Possible Dosha ⚠️", res['g_mars'][1]])
-        else: m_data.append(["Girl", "No Dosha ✅", "Safe"])
+        b_status_icon = "⚠️" if "Dosha Present" in res['b_mars'][1] else "✅"
+        g_status_icon = "⚠️" if "Dosha Present" in res['g_mars'][1] else "✅"
+        m_data.append(["Boy", b_status_icon, res['b_mars'][1]])
+        m_data.append(["Girl", g_status_icon, res['g_mars'][1]])
         st.table(pd.DataFrame(m_data, columns=["Person", "Status", "Details"]))
         
         st.markdown("### ✨ Bonus Factors")
-        chk_data = [("Mahendra", res['mahendra'], "Attachment"), ("Stree Deergha", res['stree'], "Wellbeing")]
+        chk_data = [
+            ("Mahendra", res['mahendra'], "Attachment & Wealth"),
+            ("Stree Deergha", res['stree'], "Wellbeing & Distance"),
+            ("Dina Porutham", res['dina'], "Daily Health & Prosperity")
+        ]
         st.table(pd.DataFrame(chk_data, columns=["Factor", "Status", "Meaning"]))
 
     with tab3:
         st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
-        # [Visual: Planetary Transit Chart Placeholder]
+        
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Boy's Lucky Years:**")
@@ -524,7 +554,7 @@ if st.session_state.calculated:
         mc2.markdown(f"**Girl:** {predict_wedding_month(res['g_rashi_idx'])}")
 
     with tab4:
-        st.markdown("### 🤖 Chat with Wedding Guru (Powered by Gemini)")
+        st.markdown("### 🤖 Chat with Wedding Guru")
         if not api_key:
             st.warning("Please enter your Gemini API Key in the Sidebar to use this feature.")
         else:
@@ -542,26 +572,17 @@ if st.session_state.calculated:
                 with st.chat_message("assistant"):
                     with st.spinner("Guru-ji is thinking..."):
                         try:
-                            # Use "Auto-Detect" logic to find a valid model
-                            # Fallback list of models to try in order
-                            model_name = "gemini-1.5-flash" # Default modern
-                            
-                            # Try dynamic check if possible
+                            # Auto-Detect Model Logic
+                            model_name = "gemini-1.5-flash"
                             try:
                                 for m in genai.list_models():
                                     if 'generateContent' in m.supported_generation_methods:
-                                        if 'flash' in m.name:
-                                            model_name = m.name
-                                            break
-                                        elif 'pro' in m.name:
-                                            model_name = m.name
-                            except:
-                                pass # If listing fails, stick to default
+                                        if 'flash' in m.name: model_name = m.name; break
+                                        elif 'pro' in m.name: model_name = m.name
+                            except: pass
 
-                            # Initialize Model
                             model = genai.GenerativeModel(model_name)
                             
-                            # Construct context
                             system_context = f"""
                             You are a wise Vedic Wedding Assistant.
                             Match Context: Boy ({res['b_nak']}, {res['b_rashi']}) & Girl ({res['g_nak']}, {res['g_rashi']}).
@@ -570,11 +591,7 @@ if st.session_state.calculated:
                             Answer concisely about rituals, remedies, and wedding planning.
                             """
                             
-                            # Build History
-                            history = []
-                            history.append({"role": "user", "parts": [system_context]})
-                            history.append({"role": "model", "parts": ["I understand. I am ready to assist with Vedic wedding advice."]})
-                            
+                            history = [{"role": "user", "parts": [system_context]}, {"role": "model", "parts": ["I understand."]}]
                             for m in st.session_state.messages:
                                 role = "user" if m["role"] == "user" else "model"
                                 history.append({"role": role, "parts": [m["content"]]})
@@ -595,9 +612,27 @@ if st.session_state.calculated:
 
 # --- INFO ---
 st.divider()
-with st.expander("ℹ️ How this App Works"):
+with st.expander("ℹ️ How to Read Your Results (Layman's Guide)"):
     st.markdown("""
-    **1. South Indian Checks:** Checks **Rajju** (Body Compatibility) & **Vedha**. 
-    **2. Score:** 36 Point system.
-    **3. Mars Check:** Checks Mars position from Moon.
+    ### **Step 1: The Score (Gunas)**
+    This is the "Compatibility Meter" (0 to 36).
+    * **18+:** Passable. Good for average life.
+    * **25+:** Excellent. Minds and hearts align well.
+    * **Below 18:** Not recommended without specific remedies.
+
+    ### **Step 2: The "Deal Breakers" (Doshas)**
+    Vedic astrology prioritizes safety over points. Even with a high score, these checks matter:
+    * **Rajju (Physical Safety):** Checks if the couple shares the same "body part" vibration. Different is better. *Fail = Physical risk.*
+    * **Vedha (The Enemy Check):** Checks if stars are naturally hostile to each other. *Fail = Constant fighting.*
+    * **Nadi (Genetic Health):** Checks blood/genetic compatibility. Critical for healthy children.
+
+    ### **Step 3: Mars (Mangal) Dosha**
+    Mars represents aggression and energy.
+    * If one person has "High Mars Energy" (Dosha) and the other is "Low Energy" (No Dosha), it causes imbalance.
+    * **Best Match:** Both have Dosha OR Both have No Dosha.
+    * *Note: Our app is smart! It checks if Mars is neutralized (e.g., in its own house).*
+
+    ### **Step 4: The Bonus Factors**
+    * **Mahendra:** Indicates wealth and children.
+    * **Stree Deergha:** Indicates the bride's happiness and distance from home.
     """)
