@@ -20,14 +20,25 @@ if "results" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# --- SIDEBAR (API KEY) ---
+# --- SIDEBAR (API KEY LOGIC) ---
 with st.sidebar:
     st.header("🤖 AI Settings")
-    api_key = st.text_input("Google Gemini API Key", type="password", help="Get free key at aistudio.google.com")
-    if not api_key:
-        st.warning("⚠️ Enter Gemini Key to enable the AI Guru.")
+    
+    # 1. Check if Key exists in Secrets (For Cloud Deployment)
+    if "GEMINI_API_KEY" in st.secrets:
+        st.success("✅ AI Enabled (Pro Mode)")
+        api_key = st.secrets["GEMINI_API_KEY"]
+    
+    # 2. If no secret found, ask user for key
     else:
-        st.success("✅ Gemini AI Enabled")
+        api_key = st.text_input("Google Gemini API Key", type="password", help="Get free key at aistudio.google.com")
+        if not api_key:
+            st.warning("⚠️ Enter Gemini Key to enable the AI Guru.")
+        else:
+            st.success("✅ Gemini AI Enabled")
+
+    # Configure Gemini
+    if api_key:
         try:
             genai.configure(api_key=api_key)
         except Exception as e:
