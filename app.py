@@ -125,7 +125,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v6_gemini_fix", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v7_stable", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -444,7 +444,7 @@ if st.session_state.calculated:
     
     # PERSONALITY SECTION
     st.subheader("🎭 Personality & Match Profile")
-    # [Visual: Zodiac Wheel Placeholder]
+    
     col1, col2 = st.columns(2)
     with col1:
         st.info(f"**BOY: {res['b_nak']}**")
@@ -504,7 +504,7 @@ if st.session_state.calculated:
 
     with tab3:
         st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
-        # [Visual: Planetary Transit Chart Placeholder]
+        
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Boy's Lucky Years:**")
@@ -543,7 +543,7 @@ if st.session_state.calculated:
                     with st.spinner("Guru-ji is thinking..."):
                         try:
                             # Configure model
-                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            model = genai.GenerativeModel('gemini-pro')
                             
                             # Construct context
                             system_context = f"""
@@ -582,6 +582,6 @@ st.divider()
 with st.expander("ℹ️ How this App Works"):
     st.markdown("""
     **1. South Indian Checks:** Checks **Rajju** (Body Compatibility) & **Vedha**. 
-    **2. Score:** 36 Point system.
+    **2. Score:** 36 Point system. 
     **3. Mars Check:** Checks Mars position from Moon.
     """)
