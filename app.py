@@ -114,7 +114,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v6_gemini", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v6_gemini_fix", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -433,10 +433,7 @@ if st.session_state.calculated:
     
     # PERSONALITY SECTION
     st.subheader("🎭 Personality & Match Profile")
-    
-
-[Image of the zodiac wheel]
-
+    # [Visual: Zodiac Wheel Placeholder]
     col1, col2 = st.columns(2)
     with col1:
         st.info(f"**BOY: {res['b_nak']}**")
@@ -496,7 +493,7 @@ if st.session_state.calculated:
 
     with tab3:
         st.markdown("### 🔮 Favorable Years (Jupiter Transit)")
-        
+        # [Visual: Planetary Transit Chart Placeholder]
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Boy's Lucky Years:**")
@@ -546,22 +543,18 @@ if st.session_state.calculated:
                             Answer concisely about rituals, remedies, and wedding planning.
                             """
                             
-                            # Build History for Gemini (User/Model pairs)
+                            # Build History
                             history = []
-                            # Add system context as first user message effectively
                             history.append({"role": "user", "parts": [system_context]})
-                            history.append({"role": "model", "parts": ["I understand. I am ready to assist with Vedic wedding advice based on this match."]})
+                            history.append({"role": "model", "parts": ["I understand. I am ready to assist with Vedic wedding advice."]})
                             
                             for m in st.session_state.messages:
                                 role = "user" if m["role"] == "user" else "model"
                                 history.append({"role": role, "parts": [m["content"]]})
                                 
-                            # Send to Gemini
-                            # We use the history list directly with generate_content for stateless feel or start_chat
-                            chat = model.start_chat(history=history[:-1]) # History excluding last prompt
+                            chat = model.start_chat(history=history[:-1])
                             response = chat.send_message(prompt, stream=True)
                             
-                            # Stream Output
                             full_response = ""
                             placeholder = st.empty()
                             for chunk in response:
@@ -578,6 +571,6 @@ st.divider()
 with st.expander("ℹ️ How this App Works"):
     st.markdown("""
     **1. South Indian Checks:** Checks **Rajju** (Body Compatibility) & **Vedha**. 
-    **2. Score:** 36 Point system. 
+    **2. Score:** 36 Point system.
     **3. Mars Check:** Checks Mars position from Moon.
     """)
