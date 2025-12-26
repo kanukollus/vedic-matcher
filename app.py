@@ -41,6 +41,13 @@ with st.sidebar:
     if api_key:
         try:
             genai.configure(api_key=api_key)
+            # Optional Debugger to check available models
+            with st.expander("🛠️ Debug: Available Models"):
+                try:
+                    models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    st.write(models)
+                except:
+                    st.write("Could not list models.")
         except Exception as e:
             st.error(f"API Error: {e}")
 
@@ -125,7 +132,7 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 # --- HELPERS ---
 @st.cache_resource
 def get_geolocator():
-    return Nominatim(user_agent="vedic_matcher_v8_gemini_flash", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v8_gemini_pro", timeout=10)
 
 @st.cache_resource
 def get_tf():
@@ -542,8 +549,8 @@ if st.session_state.calculated:
                 with st.chat_message("assistant"):
                     with st.spinner("Guru-ji is thinking..."):
                         try:
-                            # Use the model "gemini-1.5-flash" (latest)
-                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            # Use gemini-pro (Stable)
+                            model = genai.GenerativeModel('gemini-pro')
                             
                             # Construct context
                             system_context = f"""
