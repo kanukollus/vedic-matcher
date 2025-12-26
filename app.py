@@ -49,7 +49,7 @@ NAK_TRAITS = {
 }
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v15_1_mobile", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v15_2_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -188,6 +188,7 @@ def create_report_text(b_n, g_n, sc, r, v, b_p, g_p):
 c_title, c_reset = st.columns([3, 1])
 with c_title:
     st.title("🕉️ Vedic Matcher")
+    st.caption("Powered by Google Gemini ♊")
 with c_reset:
     if st.button("🔄 Reset", use_container_width=True):
         st.session_state.clear()
@@ -295,7 +296,7 @@ with tab_time:
         
         st.divider()
         st.subheader("Lucky Month (Sun)")
-        
+        st.caption("")
         st.info(f"💍 **{predict_wedding_month(r_idx)}** (Recurring Annually)")
 
 # --- TAB 3: AI GURU ---
