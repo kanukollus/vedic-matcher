@@ -50,7 +50,7 @@ NAK_TRAITS = {
 
 # --- OPTIMIZED CACHING ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v21_final_table", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v22_terminology", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -133,8 +133,8 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     reason = "Natural Match" if varna_raw == 1 else "Mismatch"
     
     if varna_raw == 0 and is_friends: 
-        varna_final = 1; reason = "Cancelled: Planetary Friendship"
-        cancellation_logs.append(f"**Varna:** Score 0 ➝ 1 due to strong Friendship.")
+        varna_final = 1; reason = "Cancelled: Maitri (Friendship)"
+        cancellation_logs.append(f"**Varna:** Score 0 ➝ 1 due to strong **Maitri**.")
     score += varna_final; breakdown.append(("Varna", varna_raw, varna_final, 1, reason))
     
     # 2. VASHYA
@@ -149,8 +149,9 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     yoni_full_match = (id_b == id_g)
     
     if vashya_raw < 2 and (is_friends or yoni_full_match): 
-        vashya_final = 2; reason = "Cancelled: Friendship/Yoni"
-        cancellation_logs.append(f"**Vashya:** Score {vashya_raw} ➝ 2 due to Friendship/Yoni.")
+        vashya_final = 2; reason = "Cancelled: Maitri/Yoni"
+        why = "Maitri (Friendship)" if is_friends else "Yoni Match"
+        cancellation_logs.append(f"**Vashya:** Score {vashya_raw} ➝ 2 due to **{why}**.")
     score += vashya_final; breakdown.append(("Vashya", vashya_raw, vashya_final, 2, reason))
     
     # 3. TARA
@@ -160,8 +161,8 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     reason = "Benefic" if tara_raw == 3 else "Malefic"
     
     if tara_raw == 0 and is_friends: 
-        tara_final = 3; reason = "Cancelled: Friendship"
-        cancellation_logs.append(f"**Tara:** Score 0 ➝ 3 due to Planetary Friendship.")
+        tara_final = 3; reason = "Cancelled: Maitri"
+        cancellation_logs.append(f"**Tara:** Score 0 ➝ 3 due to **Maitri** (Planetary Friendship).")
     score += tara_final; breakdown.append(("Tara", tara_raw, tara_final, 3, reason))
     
     # 4. YONI
@@ -171,8 +172,9 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     if yoni_raw < 4:
         if is_friends or bhakoot_raw_val == 7 or vashya_final >= 1: 
-            yoni_final = 4; reason = "Cancelled: Friends/Bhakoot"
-            cancellation_logs.append(f"**Yoni:** Score {yoni_raw} ➝ 4 due to Bhakoot/Friendship.")
+            yoni_final = 4; reason = "Cancelled: Maitri/Bhakoot/Vashya"
+            why = "Maitri" if is_friends else ("Bhakoot" if bhakoot_raw_val==7 else "Vashya")
+            cancellation_logs.append(f"**Yoni:** Score {yoni_raw} ➝ 4 because of **{why}**.")
     score += yoni_final; breakdown.append(("Yoni", yoni_raw, yoni_final, 4, reason))
     
     # 5. MAITRI
@@ -181,7 +183,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     if maitri_raw_score < 4 and bhakoot_raw_val == 7: 
         maitri_final = 5; reason = "Cancelled: Bhakoot Match"
-        cancellation_logs.append(f"**Maitri:** Score {maitri_raw_score} ➝ 5 due to Good Bhakoot.")
+        cancellation_logs.append(f"**Maitri:** Score {maitri_raw_score} ➝ 5 due to Good **Bhakoot**.")
     score += maitri_final; breakdown.append(("Maitri", maitri_raw_score, maitri_final, 5, reason))
     
     # 6. GANA
@@ -193,8 +195,9 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     star_dist_gb = (g_nak - b_nak) % 27
     if gana_raw < 6:
         if is_friends or bhakoot_raw_val == 7 or star_dist_gb > 14: 
-            gana_final = 6; reason = "Cancelled: Friends/Bhakoot/Dist"
-            cancellation_logs.append(f"**Gana:** Score {gana_raw} ➝ 6 due to Distance/Bhakoot.")
+            gana_final = 6; reason = "Cancelled: Maitri/Bhakoot/Dist"
+            why = "Maitri" if is_friends else ("Bhakoot" if bhakoot_raw_val==7 else "Distance")
+            cancellation_logs.append(f"**Gana:** Score {gana_raw} ➝ 6 due to **{why}**.")
     score += gana_final; breakdown.append(("Gana", gana_raw, gana_final, 6, reason))
     
     # 7. BHAKOOT
@@ -203,8 +206,9 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     if bhakoot_raw_val == 0:
         if is_friends or nadi_raw_val == 8: 
-            bhakoot_final = 7; reason = "Cancelled: Friendship/Nadi"
-            cancellation_logs.append(f"**Bhakoot:** Score 0 ➝ 7 due to Nadi/Friendship.")
+            bhakoot_final = 7; reason = "Cancelled: Maitri/Nadi"
+            why = "Maitri" if is_friends else "Nadi"
+            cancellation_logs.append(f"**Bhakoot:** Score 0 ➝ 7 due to **{why}**.")
     score += bhakoot_final; breakdown.append(("Bhakoot", bhakoot_raw_val, bhakoot_final, 7, reason))
     
     # 8. NADI
@@ -220,8 +224,8 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
              nadi_final = 8; nadi_reason = "Cancelled: Same Rashi"; nadi_msg = "Cancelled (Same Rashi)"
              cancellation_logs.append(f"**Nadi:** Score 0 ➝ 8 (Same Rashi, Different Star).")
         elif is_friends:
-             nadi_final = 8; nadi_reason = "Cancelled: Planetary Friendship"; nadi_msg = "Cancelled (Friendship)"
-             cancellation_logs.append(f"**Nadi:** Score 0 ➝ 8 due to Strong Friendship.")
+             nadi_final = 8; nadi_reason = "Cancelled: Strong Maitri"; nadi_msg = "Cancelled (Maitri)"
+             cancellation_logs.append(f"**Nadi:** Score 0 ➝ 8 due to Strong **Maitri** (Friendship).")
              
     score += nadi_final; breakdown.append(("Nadi", nadi_raw_val, nadi_final, 8, nadi_reason))
     
@@ -230,7 +234,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     rajju_status = "Fail" if rajju_group[b_nak] == rajju_group[g_nak] else "Pass"
     if rajju_status == "Fail" and (is_friends or b_rashi == g_rashi): 
         rajju_status = "Cancelled"
-        cancellation_logs.append("**Rajju Dosha:** Cancelled due to Friendship/Rashi Match.")
+        cancellation_logs.append("**Rajju Dosha:** Cancelled due to Maitri/Rashi Match.")
     
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
