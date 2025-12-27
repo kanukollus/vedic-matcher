@@ -51,24 +51,21 @@ NAK_TRAITS = {
 # --- OPTIMIZED CACHING FOR LATENCY ---
 @st.cache_resource
 def get_geolocator(): 
-    return Nominatim(user_agent="vedic_matcher_v17_optimized", timeout=10)
+    return Nominatim(user_agent="vedic_matcher_v18_cancellations", timeout=10)
 
 @st.cache_resource
 def get_tf(): 
     return TimezoneFinder()
 
-@st.cache_data(ttl=3600) # CACHE COORDINATES FOR 1 HOUR
+@st.cache_data(ttl=3600)
 def get_cached_coords(city, country):
-    """Fetches and caches lat/lon to reduce API latency"""
     geolocator = get_geolocator()
-    try:
-        return geolocator.geocode(f"{city}, {country}")
-    except:
-        return None
+    try: return geolocator.geocode(f"{city}, {country}")
+    except: return None
 
 def get_offset_smart(city, country, dt, manual_tz):
     tf = get_tf()
-    loc = get_cached_coords(city, country) # Use Cached Function
+    loc = get_cached_coords(city, country)
     try:
         if loc:
             tz_name = tf.timezone_at(lng=loc.longitude, lat=loc.latitude)
@@ -120,43 +117,104 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
+# --- ADVANCED CALCULATION LOGIC (WITH CANCELLATIONS) ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
-    score = 0; breakdown = []
-    varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0; score += varna
-    breakdown.append(("Varna", varna, 1))
+    # 1. PRELIMINARY CALCULATIONS
+    maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
+    is_friends = maitri_raw >= 4 # Friends or Sign match
+    
+    bhakoot_dist = (b_rashi - g_rashi) % 12
+    bhakoot_raw = 7 if bhakoot_dist not in [1, 11, 4, 8, 5, 7] else 0
+    
+    nadi_raw = 0 if NADI_TYPE[b_nak] == NADI_TYPE[g_nak] else 8
+    
+    score = 0
+    breakdown = []
+    
+    # 2. VARNA (1 Point)
+    # Cancellation: If Rashi Lords are friends/same
+    varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
+    if varna == 0 and is_friends: varna = 1 # Cancellation applied
+    score += varna; breakdown.append(("Varna", varna, 1))
+    
+    # 3. VASHYA (2 Points)
+    # Cancellation: If Maitri is good OR Yoni is matching
     vashya = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: vashya = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): vashya = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: vashya = 0.5 
-    score += vashya; breakdown.append(("Vashya", vashya, 2))
-    tara = 3 if ((b_nak - g_nak) % 27 + 1) % 9 not in [3, 5, 7] else 0; score += tara
-    breakdown.append(("Tara", tara, 3))
+    
+    # Yoni Pre-calc for Vashya Check
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
+    yoni_full_match = (id_b == id_g)
+    
+    if vashya < 2 and (is_friends or yoni_full_match): vashya = 2 # Cancellation
+    score += vashya; breakdown.append(("Vashya", vashya, 2))
+    
+    # 4. TARA (3 Points)
+    # Cancellation: If Maitri is good
+    count = (b_nak - g_nak) % 27 + 1
+    tara = 3 if count % 9 not in [3, 5, 7] else 0
+    if tara == 0 and is_friends: tara = 3 # Cancellation
+    score += tara; breakdown.append(("Tara", tara, 3))
+    
+    # 5. YONI (4 Points)
+    # Cancellation: If Maitri good OR Bhakoot Good OR Vashya >= 1
     yoni = 4 if id_b == id_g else (0 if YONI_Enemy_Map.get(id_b) == id_g or YONI_Enemy_Map.get(id_g) == id_b else 2)
+    if yoni < 4:
+        if is_friends or bhakoot_raw == 7 or vashya >= 1: yoni = 4 # Cancellation
     score += yoni; breakdown.append(("Yoni", yoni, 4))
-    maitri = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]; score += maitri
-    breakdown.append(("Maitri", maitri, 5))
+    
+    # 6. MAITRI (5 Points)
+    # Cancellation: If Bhakoot is Good
+    maitri = maitri_raw
+    if maitri < 4 and bhakoot_raw == 7: maitri = 5 # Cancellation
+    score += maitri; breakdown.append(("Maitri", maitri, 5))
+    
+    # 7. GANA (6 Points)
+    # Cancellation: Maitri Good OR Bhakoot Good OR Star Distance > 14
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     gana = 6 if gb == gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else (1 if (gg==0 and gb==2) or (gg==2 and gb==0) else 5))
+    
+    star_dist_gb = (g_nak - b_nak) % 27
+    if gana < 6:
+        if is_friends or bhakoot_raw == 7 or star_dist_gb > 14: gana = 6 # Cancellation
     score += gana; breakdown.append(("Gana", gana, 6))
-    dist = (b_rashi - g_rashi) % 12
-    bhakoot = 7 if dist not in [1, 11, 4, 8, 5, 7] else (7 if maitri >= 4 else 0)
+    
+    # 8. BHAKOOT (7 Points)
+    # Cancellation: Maitri Good OR Nadi Good
+    bhakoot = bhakoot_raw
+    if bhakoot == 0:
+        if is_friends or nadi_raw == 8: bhakoot = 7 # Cancellation
     score += bhakoot; breakdown.append(("Bhakoot", bhakoot, 7))
+    
+    # 9. NADI (8 Points)
+    # Cancellation: Same Rashi but Different Stars
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
     nadi = 8; nadi_msg = "OK"
     if nb == ng:
         nadi = 0; nadi_msg = "Dosha (0 Pts)"
-        if b_nak == g_nak:
-            if NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: nadi = 8; nadi_msg = "Exception: Allowed Star"
-            else: nadi_msg = "Dosha (Same Star)"
-        elif b_rashi == g_rashi or maitri >= 4: nadi = 8; nadi_msg = "Cancelled (Friend/Rashi)"
+        # Exception 1: Allowed Stars list
+        if b_nak == g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED:
+             nadi = 8; nadi_msg = "Exception: Allowed Star"
+        # Exception 2: Same Rashi, Different Star (The User Rule)
+        elif b_rashi == g_rashi and b_nak != g_nak:
+             nadi = 8; nadi_msg = "Cancelled (Same Rashi)"
+        # Exception 3: Friendship (Strong Maitri)
+        elif is_friends:
+             nadi = 8; nadi_msg = "Cancelled (Planetary Friendship)"
+             
     score += nadi; breakdown.append(("Nadi", nadi, 8))
+    
+    # South Indian Checks
     rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     rajju_status = "Fail" if rajju_group[b_nak] == rajju_group[g_nak] else "Pass"
-    if rajju_status == "Fail" and (maitri >= 4 or b_rashi == g_rashi): rajju_status = "Cancelled"
+    if rajju_status == "Fail" and (is_friends or b_rashi == g_rashi): rajju_status = "Cancelled"
+    
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
     vedha_status = "Fail" if vedha_pairs.get(g_nak) == b_nak else "Pass"
+    
     return score, breakdown, rajju_status, vedha_status, nadi_msg
 
 def calculate_advanced(b_nak, g_nak):
@@ -238,10 +296,8 @@ with tab_match:
             g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # Uttara Phalguni
             # Smart Default: If Virgo (Kanya) is in list, select it. Else 0.
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
-            try:
-                g_def_idx = g_rashi_opts.index("Virgo (Kanya)")
-            except:
-                g_def_idx = 0
+            try: g_def_idx = g_rashi_opts.index("Virgo (Kanya)")
+            except: g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Calculate Match", type="primary", use_container_width=True):
@@ -316,12 +372,14 @@ with tab_time:
         r_idx = RASHIS.index(t_rashi)
         st.divider()
         st.subheader("Lucky Years (Jupiter)")
+        
         for y, s in predict_marriage_luck_years(r_idx):
             icon = "✅" if "Excellent" in s else "😐"
             st.write(f"**{y}:** {icon} {s}")
         
         st.divider()
         st.subheader("Lucky Month (Sun)")
+        
         st.info(f"💍 **{predict_wedding_month(r_idx)}** (Recurring Annually)")
 
 # --- TAB 3: AI GURU ---
