@@ -48,22 +48,34 @@ NAK_TRAITS = {
     24: {"Symbol": "Sword", "Animal": "Lion", "Trait": "Passionate"}, 25: {"Symbol": "Twins", "Animal": "Cow", "Trait": "Ascetic"}, 26: {"Symbol": "Drum", "Animal": "Elephant", "Trait": "Complete"}
 }
 
+# --- OPTIMIZED CACHING FOR LATENCY ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v16_1_final", timeout=10)
+def get_geolocator(): 
+    return Nominatim(user_agent="vedic_matcher_v17_optimized", timeout=10)
+
 @st.cache_resource
-def get_tf(): return TimezoneFinder()
+def get_tf(): 
+    return TimezoneFinder()
+
+@st.cache_data(ttl=3600) # CACHE COORDINATES FOR 1 HOUR
+def get_cached_coords(city, country):
+    """Fetches and caches lat/lon to reduce API latency"""
+    geolocator = get_geolocator()
+    try:
+        return geolocator.geocode(f"{city}, {country}")
+    except:
+        return None
 
 def get_offset_smart(city, country, dt, manual_tz):
-    geolocator = get_geolocator()
     tf = get_tf()
+    loc = get_cached_coords(city, country) # Use Cached Function
     try:
-        loc = geolocator.geocode(f"{city}, {country}")
         if loc:
             tz_name = tf.timezone_at(lng=loc.longitude, lat=loc.latitude)
             if tz_name:
                 timezone = pytz.timezone(tz_name)
                 localized_dt = timezone.localize(dt)
-                return localized_dt.utcoffset().total_seconds() / 3600.0, f"📍 Found: {city} ({tz_name})"
+                return localized_dt.utcoffset().total_seconds() / 3600.0, f"📍 Found: {city}"
         raise ValueError
     except: return manual_tz, f"⚠️ Using Manual TZ: {manual_tz}"
 
@@ -219,11 +231,18 @@ with tab_match:
     else:
         c1, c2 = st.columns(2)
         with c1:
-            b_star = st.selectbox("Boy Star", NAKSHATRAS, index=0, key="b_s") # Ashwini Default
-            b_rashi_sel = st.selectbox("Boy Rashi", [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]], key="b_r")
+            b_star = st.selectbox("Boy Star", NAKSHATRAS, index=0, key="b_s") # Ashwini
+            b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
+            b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # Uttara Phalguni Default (Index 11)
-            g_rashi_sel = st.selectbox("Girl Rashi", [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]], key="g_r")
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # Uttara Phalguni
+            # Smart Default: If Virgo (Kanya) is in list, select it. Else 0.
+            g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
+            try:
+                g_def_idx = g_rashi_opts.index("Virgo (Kanya)")
+            except:
+                g_def_idx = 0
+            g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Calculate Match", type="primary", use_container_width=True):
         try:
@@ -233,14 +252,12 @@ with tab_match:
                     g_moon, g_mars_l, g_msg = get_planetary_positions(g_date, g_time, g_city, g_country, 5.5)
                     if b_moon is None: st.error("Location Error"); st.stop()
                     
-                    # GET CALCULATED INDICES
                     b_nak, b_rashi = get_nak_rashi(b_moon)
                     g_nak, g_rashi = get_nak_rashi(g_moon)
                     
                     b_mars = check_mars_dosha_smart(b_rashi, b_mars_l)
                     g_mars = check_mars_dosha_smart(g_rashi, g_mars_l)
                     
-                    # SHOW VALIDATION INFO FOR USER
                     st.success("✅ Calculations Complete!")
                     val1, val2 = st.columns(2)
                     val1.info(f"**Boy:** {NAKSHATRAS[b_nak]} ({RASHIS[b_rashi]})")
