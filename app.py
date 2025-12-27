@@ -48,14 +48,11 @@ NAK_TRAITS = {
     24: {"Symbol": "Sword", "Animal": "Lion", "Trait": "Passionate"}, 25: {"Symbol": "Twins", "Animal": "Cow", "Trait": "Ascetic"}, 26: {"Symbol": "Drum", "Animal": "Elephant", "Trait": "Complete"}
 }
 
-# --- OPTIMIZED CACHING FOR LATENCY ---
+# --- OPTIMIZED CACHING ---
 @st.cache_resource
-def get_geolocator(): 
-    return Nominatim(user_agent="vedic_matcher_v18_cancellations", timeout=10)
-
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v19_reasoning", timeout=10)
 @st.cache_resource
-def get_tf(): 
-    return TimezoneFinder()
+def get_tf(): return TimezoneFinder()
 
 @st.cache_data(ttl=3600)
 def get_cached_coords(city, country):
@@ -117,96 +114,99 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- ADVANCED CALCULATION LOGIC (WITH CANCELLATIONS) ---
+# --- ADVANCED CALCULATION LOGIC (WITH REASONING) ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
-    # 1. PRELIMINARY CALCULATIONS
+    # PRELIMINARY DATA
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
-    is_friends = maitri_raw >= 4 # Friends or Sign match
-    
+    is_friends = maitri_raw >= 4
     bhakoot_dist = (b_rashi - g_rashi) % 12
     bhakoot_raw = 7 if bhakoot_dist not in [1, 11, 4, 8, 5, 7] else 0
-    
     nadi_raw = 0 if NADI_TYPE[b_nak] == NADI_TYPE[g_nak] else 8
     
     score = 0
     breakdown = []
     
-    # 2. VARNA (1 Point)
-    # Cancellation: If Rashi Lords are friends/same
+    # 1. VARNA (1 Point)
     varna = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
-    if varna == 0 and is_friends: varna = 1 # Cancellation applied
-    score += varna; breakdown.append(("Varna", varna, 1))
+    reason = "Natural Match" if varna == 1 else "Mismatch"
+    if varna == 0 and is_friends: 
+        varna = 1; reason = "Cancelled: Planetary Friendship"
+    score += varna; breakdown.append(("Varna", varna, 1, reason))
     
-    # 3. VASHYA (2 Points)
-    # Cancellation: If Maitri is good OR Yoni is matching
+    # 2. VASHYA (2 Points)
     vashya = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: vashya = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): vashya = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: vashya = 0.5 
+    reason = "Partial/Full Match" if vashya >= 1 else "Mismatch"
     
-    # Yoni Pre-calc for Vashya Check
+    # Yoni check for Vashya Exception
     id_b, id_g = YONI_ID[b_nak], YONI_ID[g_nak]
     yoni_full_match = (id_b == id_g)
     
-    if vashya < 2 and (is_friends or yoni_full_match): vashya = 2 # Cancellation
-    score += vashya; breakdown.append(("Vashya", vashya, 2))
+    if vashya < 2 and (is_friends or yoni_full_match): 
+        vashya = 2; reason = "Cancelled: Friendship/Yoni Match"
+    score += vashya; breakdown.append(("Vashya", vashya, 2, reason))
     
-    # 4. TARA (3 Points)
-    # Cancellation: If Maitri is good
+    # 3. TARA (3 Points)
     count = (b_nak - g_nak) % 27 + 1
     tara = 3 if count % 9 not in [3, 5, 7] else 0
-    if tara == 0 and is_friends: tara = 3 # Cancellation
-    score += tara; breakdown.append(("Tara", tara, 3))
+    reason = "Benefic Star" if tara == 3 else "Malefic Star"
+    if tara == 0 and is_friends: 
+        tara = 3; reason = "Cancelled: Planetary Friendship"
+    score += tara; breakdown.append(("Tara", tara, 3, reason))
     
-    # 5. YONI (4 Points)
-    # Cancellation: If Maitri good OR Bhakoot Good OR Vashya >= 1
+    # 4. YONI (4 Points)
     yoni = 4 if id_b == id_g else (0 if YONI_Enemy_Map.get(id_b) == id_g or YONI_Enemy_Map.get(id_g) == id_b else 2)
+    reason = "Same Species" if yoni == 4 else ("Enemy Species" if yoni == 0 else "Neutral Species")
     if yoni < 4:
-        if is_friends or bhakoot_raw == 7 or vashya >= 1: yoni = 4 # Cancellation
-    score += yoni; breakdown.append(("Yoni", yoni, 4))
+        if is_friends or bhakoot_raw == 7 or vashya >= 1: 
+            yoni = 4; reason = "Cancelled: Friends/Bhakoot/Vashya"
+    score += yoni; breakdown.append(("Yoni", yoni, 4, reason))
     
-    # 6. MAITRI (5 Points)
-    # Cancellation: If Bhakoot is Good
+    # 5. MAITRI (5 Points)
     maitri = maitri_raw
-    if maitri < 4 and bhakoot_raw == 7: maitri = 5 # Cancellation
-    score += maitri; breakdown.append(("Maitri", maitri, 5))
+    reason = "Friendly Lords" if maitri >= 4 else "Enemy Lords"
+    if maitri < 4 and bhakoot_raw == 7: 
+        maitri = 5; reason = "Cancelled: Bhakoot Match"
+    score += maitri; breakdown.append(("Maitri", maitri, 5, reason))
     
-    # 7. GANA (6 Points)
-    # Cancellation: Maitri Good OR Bhakoot Good OR Star Distance > 14
+    # 6. GANA (6 Points)
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     gana = 6 if gb == gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else (1 if (gg==0 and gb==2) or (gg==2 and gb==0) else 5))
+    reason = "Temperament Match" if gana >= 5 else "Temperament Clash"
     
     star_dist_gb = (g_nak - b_nak) % 27
     if gana < 6:
-        if is_friends or bhakoot_raw == 7 or star_dist_gb > 14: gana = 6 # Cancellation
-    score += gana; breakdown.append(("Gana", gana, 6))
+        if is_friends or bhakoot_raw == 7 or star_dist_gb > 14: 
+            gana = 6; reason = "Cancelled: Friends/Bhakoot/Distance"
+    score += gana; breakdown.append(("Gana", gana, 6, reason))
     
-    # 8. BHAKOOT (7 Points)
-    # Cancellation: Maitri Good OR Nadi Good
+    # 7. BHAKOOT (7 Points)
     bhakoot = bhakoot_raw
+    reason = "Good Relative Position" if bhakoot == 7 else "Bad Relative Position (6-8, 2-12, 5-9)"
     if bhakoot == 0:
-        if is_friends or nadi_raw == 8: bhakoot = 7 # Cancellation
-    score += bhakoot; breakdown.append(("Bhakoot", bhakoot, 7))
+        if is_friends or nadi_raw == 8: 
+            bhakoot = 7; reason = "Cancelled: Friendship/Nadi"
+    score += bhakoot; breakdown.append(("Bhakoot", bhakoot, 7, reason))
     
-    # 9. NADI (8 Points)
-    # Cancellation: Same Rashi but Different Stars
+    # 8. NADI (8 Points)
     nb, ng = NADI_TYPE[b_nak], NADI_TYPE[g_nak]
-    nadi = 8; nadi_msg = "OK"
+    nadi = 8; nadi_reason = "Different Nadis (Healthy)"
+    nadi_msg = "OK"
     if nb == ng:
-        nadi = 0; nadi_msg = "Dosha (0 Pts)"
-        # Exception 1: Allowed Stars list
+        nadi = 0; nadi_reason = "Same Nadi (Dosha)"
+        nadi_msg = "Dosha (0 Pts)"
         if b_nak == g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED:
-             nadi = 8; nadi_msg = "Exception: Allowed Star"
-        # Exception 2: Same Rashi, Different Star (The User Rule)
+             nadi = 8; nadi_reason = "Exception: Allowed Star"; nadi_msg = "Exception: Allowed Star"
         elif b_rashi == g_rashi and b_nak != g_nak:
-             nadi = 8; nadi_msg = "Cancelled (Same Rashi)"
-        # Exception 3: Friendship (Strong Maitri)
+             nadi = 8; nadi_reason = "Cancelled: Same Rashi"; nadi_msg = "Cancelled (Same Rashi)"
         elif is_friends:
-             nadi = 8; nadi_msg = "Cancelled (Planetary Friendship)"
+             nadi = 8; nadi_reason = "Cancelled: Planetary Friendship"; nadi_msg = "Cancelled (Friendship)"
              
-    score += nadi; breakdown.append(("Nadi", nadi, 8))
+    score += nadi; breakdown.append(("Nadi", nadi, 8, nadi_reason))
     
-    # South Indian Checks
+    # SOUTH INDIAN CHECKS
     rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     rajju_status = "Fail" if rajju_group[b_nak] == rajju_group[g_nak] else "Pass"
     if rajju_status == "Fail" and (is_friends or b_rashi == g_rashi): rajju_status = "Cancelled"
@@ -251,8 +251,10 @@ def handle_ai_query(prompt, context_str, key):
         return response.text
     except Exception as e: return f"Error: {e}"
 
-def create_report_text(b_n, g_n, sc, r, v, b_p, g_p):
-    return f"MATCH REPORT\nBoy: {b_n} ({b_p['Trait']})\nGirl: {g_n} ({g_p['Trait']})\nScore: {sc}/36\nRajju: {r}\nVedha: {v}"
+def create_report_text(b_n, g_n, sc, r, v, b_p, g_p, bd):
+    txt = f"MATCH REPORT\nBoy: {b_n} ({b_p['Trait']})\nGirl: {g_n} ({g_p['Trait']})\nScore: {sc}/36\nRajju: {r}\nVedha: {v}\n\nDETAILS:\n"
+    for item in bd: txt += f"{item[0]}: {item[1]} / {item[2]} ({item[3]})\n"
+    return txt
 
 # --- MAIN LAYOUT (MOBILE FIRST) ---
 c_title, c_reset = st.columns([3, 1])
@@ -350,11 +352,14 @@ with tab_match:
         with c_res2:
             st.plotly_chart(create_gauge(res['score']), use_container_width=True)
         
-        with st.expander("📊 Detailed Breakdown & Downloads"):
-            st.table(pd.DataFrame(res['breakdown'], columns=["Attribute", "Points", "Max"]))
+        with st.expander("📊 Detailed Breakdown & Downloads", expanded=True):
+            # Display breakdown with new Reasoning column
+            df_display = pd.DataFrame(res['breakdown'], columns=["Attribute", "Score", "Max", "Notes"])
+            st.table(df_display)
+            
             # Downloads
-            txt_data = create_report_text(res['b_nak'], res['g_nak'], res['score'], res['rajju'], res['vedha'], res['b_prof'], res['g_prof'])
-            st.download_button("📥 Save Report (TXT)", txt_data, "report.txt")
+            txt_data = create_report_text(res['b_nak'], res['g_nak'], res['score'], res['rajju'], res['vedha'], res['b_prof'], res['g_prof'], res['breakdown'])
+            st.download_button("📥 Save Detailed Report (TXT)", txt_data, "report.txt")
             
         with st.expander("🪐 Dosha Analysis (Mars/Rajju)"):
             st.write(f"**Rajju:** {res['rajju']} (Body Check)")
