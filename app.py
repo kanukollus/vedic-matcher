@@ -49,7 +49,7 @@ NAK_TRAITS = {
 }
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v16_final", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v16_1_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -232,11 +232,20 @@ with tab_match:
                     b_moon, b_mars_l, b_msg = get_planetary_positions(b_date, b_time, b_city, b_country, 5.5)
                     g_moon, g_mars_l, g_msg = get_planetary_positions(g_date, g_time, g_city, g_country, 5.5)
                     if b_moon is None: st.error("Location Error"); st.stop()
+                    
+                    # GET CALCULATED INDICES
                     b_nak, b_rashi = get_nak_rashi(b_moon)
                     g_nak, g_rashi = get_nak_rashi(g_moon)
+                    
                     b_mars = check_mars_dosha_smart(b_rashi, b_mars_l)
                     g_mars = check_mars_dosha_smart(g_rashi, g_mars_l)
-                    st.success("Planets Calculated Successfully")
+                    
+                    # SHOW VALIDATION INFO FOR USER
+                    st.success("✅ Calculations Complete!")
+                    val1, val2 = st.columns(2)
+                    val1.info(f"**Boy:** {NAKSHATRAS[b_nak]} ({RASHIS[b_rashi]})")
+                    val2.info(f"**Girl:** {NAKSHATRAS[g_nak]} ({RASHIS[g_rashi]})")
+                    
             else:
                 b_nak = NAKSHATRAS.index(b_star); b_rashi = RASHIS.index(b_rashi_sel)
                 g_nak = NAKSHATRAS.index(g_star); g_rashi = RASHIS.index(g_rashi_sel)
@@ -353,7 +362,6 @@ with st.expander("ℹ️ How to Read Results & Disclaimer"):
     * **Below 18:** Not recommended without remedies.
 
     ### **2. The Critical Checks (Doshas)**
-    
     * **Rajju (Body):** Must be 'Pass'. Indicates physical safety.
     * **Vedha (Enemy):** Must be 'Pass'. Indicates conflict.
     * **Nadi (Genes):** Critical for health/lineage.
