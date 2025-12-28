@@ -40,6 +40,16 @@ st.markdown("""
     .text-red { color: #ff4b4b !important; }
     .text-orange { color: #ffa500 !important; }
     .text-green { color: #00cc00 !important; }
+    
+    .highlight-box {
+        background-color: #fff9c4;
+        color: #31333F;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+        border: 1px solid #fbc02d;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,7 +76,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v32_regression_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v33_ai_context", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -219,16 +229,33 @@ def find_best_matches(source_gender, s_nak, s_rashi):
         for r_idx in valid_rashi_indices:
             target_rashi_name = RASHIS[r_idx]
             if source_gender == "Boy":
-                score, _, _, _, _ = calculate_all(s_nak, s_rashi, i, r_idx)
+                score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, r_idx)
             else:
-                score, _, _, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
+                score, bd, logs, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
+            
+            # Calculate Raw Score sum (bd[item][1])
+            raw_score = sum(item[1] for item in bd)
+            
+            # Formatting "Reason" for table (Just take the first main cancellation if exists)
+            reason = logs[0] if logs else "Standard Match"
+            if score == 36: reason = "Perfect Match!"
             
             matches.append({
                 "Star": target_star_name,
                 "Rashi": target_rashi_name,
-                "Score": score
+                "Final Score": score,
+                "Raw Score": raw_score,
+                "Notes": reason
             })
-    return sorted(matches, key=lambda x: x['Score'], reverse=True)
+    return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
+
+def handle_ai_query(prompt, context_str, key):
+    try:
+        genai.configure(api_key=key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I understand. I am your Vedic Astrology Guru."]}])
+        return chat.send_message(prompt).text
+    except Exception as e: return f"Error: {e}"
 
 # --- UI START ---
 c_title, c_reset = st.columns([4, 1])
@@ -316,6 +343,7 @@ with tabs[0]:
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
+        st.caption("👆 Copy to share on WhatsApp")
         
         st.markdown("### 📋 Quick Scan")
         for item in res['bd']:
@@ -369,8 +397,15 @@ with tabs[1]:
             st.success(f"Found {len(matches)} combinations!")
             st.markdown("### Top Matches")
             
+            # COPY TO CLIPBOARD FEATURE FOR FINDER
+            if matches:
+                top_match = matches[0]
+                share_txt = f"I matched my star ({finder_star}) and found the best match is {top_match['Star']} ({top_match['Rashi']}) with a score of {top_match['Final Score']}/36!"
+                st.code(share_txt, language="text")
+                st.caption("👆 Copy top result for WhatsApp")
+
             df_matches = pd.DataFrame(matches)
-            df_matches['Rating'] = df_matches['Score'].apply(lambda x: "⭐⭐⭐" if x > 25 else ("⭐⭐" if x > 18 else "⭐"))
+            df_matches['Rating'] = df_matches['Final Score'].apply(lambda x: "⭐⭐⭐" if x > 25 else ("⭐⭐" if x > 18 else "⭐"))
             st.dataframe(df_matches, use_container_width=True, hide_index=True)
 
 # --- TAB 3: WEDDING DATES ---
@@ -391,21 +426,48 @@ with tabs[2]:
 # --- TAB 4: AI GURU ---
 with tabs[3]:
     st.header("🤖 Guru AI")
-    # RESTORED: Check secrets first
+    
+    # CONTEXT AWARENESS LOGIC
+    context = "You are a Vedic Astrologer."
+    suggestions = ["Best wedding colors?", "Remedies for Nadi Dosha?", "Explain Rajju Dosha"]
+    
+    if st.session_state.calculated:
+        r = st.session_state.results
+        context += f" Match Context: Boy {r['b_n']}, Girl {r['g_n']}. Score: {r['score']}/36. Doshas: Rajju={r['rajju']}, Vedha={r['vedha']}."
+        # SMART SUGGESTIONS
+        suggestions = ["Analyze this match detailed", "Any remedies needed?", "Is this good for marriage?"]
+        if r['rajju'] == "Fail": suggestions.append("Remedies for Rajju Dosha")
+        if r['score'] < 18: suggestions.append("Why is the score low?")
+        st.success(f"Context Loaded: {r['b_n']} ❤️ {r['g_n']}")
+
+    # API KEY LOGIC
     user_key = st.secrets.get("GEMINI_API_KEY", None)
     if not user_key:
         user_key = st.text_input("API Key (Get at aistudio.google.com)", type="password")
     
-    if user_key and (query := st.chat_input("Ask about today's stars...")):
-        genai.configure(api_key=user_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        with st.spinner("Thinking..."):
-            try:
-                st.write(model.generate_content(query).text)
-            except Exception as e:
-                st.error(f"AI Error: {e}")
+    # BUTTONS FOR SUGGESTIONS
+    cols = st.columns(3)
+    clicked_prompt = None
+    for i, s in enumerate(suggestions):
+        if cols[i%3].button(s, use_container_width=True): clicked_prompt = s
 
-# --- RESTORED FOOTER ---
+    # CHAT UI
+    if user_key:
+        for m in st.session_state.messages:
+            with st.chat_message(m["role"]): st.write(m["content"])
+            
+        if (prompt := st.chat_input("Ask about today's stars...")) or clicked_prompt:
+            final_prompt = prompt if prompt else clicked_prompt
+            st.session_state.messages.append({"role": "user", "content": final_prompt})
+            with st.chat_message("user"): st.write(final_prompt)
+            
+            with st.chat_message("assistant"):
+                with st.spinner("Consulting texts..."):
+                    ans = handle_ai_query(final_prompt, context, user_key)
+                    st.write(ans)
+                    st.session_state.messages.append({"role": "assistant", "content": ans})
+
+# --- FOOTER ---
 st.divider()
 with st.expander("ℹ️ How to Read Results & Disclaimer"):
     st.markdown("""
