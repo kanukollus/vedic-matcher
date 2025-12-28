@@ -50,7 +50,7 @@ NAK_TRAITS = {
 
 # --- OPTIMIZED CACHING ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v22_human_logic", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v23_ui_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 
@@ -289,6 +289,8 @@ with c_title:
 with c_reset:
     if st.button("🔄 Reset", use_container_width=True):
         st.session_state.clear()
+        # FIX: Explicitly set the radio key back to "Birth Details" to ensure UI updates
+        st.session_state["input_mode"] = "Birth Details"
         st.rerun()
 
 # TABS NAVIGATION
@@ -297,7 +299,9 @@ tab_match, tab_time, tab_ai = st.tabs(["❤️ Match", "📅 Timing", "🤖 AI G
 # --- TAB 1: MATCH ---
 with tab_match:
     st.caption("Calculate compatibility score & Doshas.")
-    input_method = st.radio("Mode:", ["Birth Details", "Direct Star Entry"], horizontal=True)
+    
+    # FIX: Added key="input_mode" to ensure we can reset it programmatically
+    input_method = st.radio("Mode:", ["Birth Details", "Direct Star Entry"], horizontal=True, key="input_mode")
     
     if input_method == "Birth Details":
         c1, c2 = st.columns(2)
@@ -416,12 +420,12 @@ with tab_time:
     st.header("📅 Wedding Timing")
     st.caption("Best time based on Boy/Girl Moon Sign.")
     
+    
     t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
     if st.button("Check Auspicious Dates", use_container_width=True):
         r_idx = RASHIS.index(t_rashi)
         st.divider()
         st.subheader("Lucky Years (Jupiter)")
-        
         for y, s in predict_marriage_luck_years(r_idx):
             icon = "✅" if "Excellent" in s else "😐"
             st.write(f"**{y}:** {icon} {s}")
