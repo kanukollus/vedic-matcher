@@ -46,6 +46,7 @@ st.markdown("""
 # --- SESSION STATE ---
 if "calculated" not in st.session_state: st.session_state.calculated = False
 if "results" not in st.session_state: st.session_state.results = {}
+if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
 
 # --- DATA ---
@@ -65,7 +66,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v31_final", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v32_regression_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -239,7 +240,7 @@ with c_reset:
         st.session_state.calculated = False
         st.rerun()
 
-# --- 4 DISTINCT TABS (REMOVED DAILY GUIDE) ---
+# --- 4 DISTINCT TABS ---
 tabs = st.tabs(["❤️ Match", "🔍 Find Matches", "💍 Wedding Dates", "🤖 Guru AI"])
 
 # --- TAB 1: MATCH ---
@@ -390,9 +391,37 @@ with tabs[2]:
 # --- TAB 4: AI GURU ---
 with tabs[3]:
     st.header("🤖 Guru AI")
-    user_key = st.text_input("API Key", type="password")
+    # RESTORED: Check secrets first
+    user_key = st.secrets.get("GEMINI_API_KEY", None)
+    if not user_key:
+        user_key = st.text_input("API Key (Get at aistudio.google.com)", type="password")
+    
     if user_key and (query := st.chat_input("Ask about today's stars...")):
         genai.configure(api_key=user_key)
         model = genai.GenerativeModel("gemini-1.5-flash")
         with st.spinner("Thinking..."):
-            st.write(model.generate_content(query).text)
+            try:
+                st.write(model.generate_content(query).text)
+            except Exception as e:
+                st.error(f"AI Error: {e}")
+
+# --- RESTORED FOOTER ---
+st.divider()
+with st.expander("ℹ️ How to Read Results & Disclaimer"):
+    st.markdown("""
+    ### **1. The Score (Gunas)**
+    * **18-24:** Good Match.
+    * **25-36:** Excellent Match.
+    * **Below 18:** Not recommended without remedies.
+
+    ### **2. The Critical Checks (Doshas)**
+    * **Rajju (Body):** Must be 'Pass'. Indicates physical safety.
+    * **Vedha (Enemy):** Must be 'Pass'. Indicates conflict.
+    * **Nadi (Genes):** Critical for health/lineage.
+
+    ### **3. Mars (Mangal) Dosha**
+    * Checks if Mars energy is balanced between the couple.
+    * *Note: This app automatically checks for cancellations (e.g., Mars in own house).*
+    """)
+    st.caption("----------------------------------------------------------------")
+    st.caption("⚠️ **Disclaimer:** This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features are powered by Google Gemini. Calculations are based on Lahiri Ayanamsa. This is for informational purposes only; please consult a human astrologer for final marriage decisions.")
