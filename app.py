@@ -39,6 +39,7 @@ if "calculated" not in st.session_state: st.session_state.calculated = False
 if "results" not in st.session_state: st.session_state.results = {}
 if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
+if "api_key" not in st.session_state: st.session_state.api_key = ""
 
 # --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
@@ -60,11 +61,10 @@ RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4]
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
-NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v60_final_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v61_ai_bridge", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -185,7 +185,6 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
     if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
-    
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
@@ -193,20 +192,17 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
             observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity.")
         elif any(p in ["Jup", "Ven", "Merc"] for p in occupants):
             observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony and affection.")
-            
     aspectors = []
     for r_idx, planets in chart_data.items():
         dist = (house_7_idx - r_idx) % 12 + 1 
         for p in planets:
             if p in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p]: aspectors.append(p)
             elif dist == 7: aspectors.append(p)
-                
     if aspectors:
         aspectors = list(set(aspectors))
         if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
         if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds energy and passion, but arguments can get heated.")
         if "Jup" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
-        
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
@@ -214,15 +210,12 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
-    
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
-    
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
     else: verdict += "These periods complement each other well for growth."
-        
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -295,9 +288,9 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score += bh_final; bd.append(("Bhakoot", bh_raw, bh_final, 7, reason))
     
     # 8. Nadi
-    n_raw = 8; n_final = 8; n_reason = "Healthy" # Default
+    n_raw = 8; n_final = 8; n_reason = "Healthy"
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
-        n_raw = 0; n_final = 0; n_reason = "Same Nadi (Dosha)" # Default FAIL reason
+        n_raw = 0; n_final = 0; n_reason = "Same Nadi (Dosha)"
         problem = f"{NADI_NAMES[NADI_TYPE[b_nak]]} vs {NADI_NAMES[NADI_TYPE[g_nak]]}"
         if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: 
             n_final=8; n_reason="Exception: Allowed Star"
@@ -362,24 +355,23 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
-# --- AUTO-DETECT MODEL ---
-def get_working_model(key):
-    genai.configure(api_key=key)
-    try:
-        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        if available: return available[0]
-    except: pass
-    return "models/gemini-1.5-flash"
-
+# --- STRICT MODEL SELECTION AI HANDLER ---
 def handle_ai_query(prompt, context_str, key):
     try:
-        model_name = get_working_model(key)
-        model = genai.GenerativeModel(model_name)
-        chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
-        return chat.send_message(prompt).text
-    except Exception as e:
-        if "429" in str(e): return "⚠️ **Quota Exceeded:** You are clicking too fast! Please wait 60 seconds."
-        return f"AI Error: {str(e)}"
+        genai.configure(api_key=key)
+        candidates = ["gemini-1.5-flash"]
+        last_err = None
+        for m in candidates:
+            try:
+                model = genai.GenerativeModel(m)
+                chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
+                return chat.send_message(prompt).text
+            except Exception as e:
+                if "429" in str(e): return "⚠️ **Quota Exceeded:** Free AI limit reached. Please wait 60s."
+                last_err = str(e)
+                continue
+        return f"AI Error: {last_err}"
+    except Exception as e: return f"Error: {e}"
 
 # --- UI START ---
 c_title, c_reset = st.columns([4, 1])
@@ -421,14 +413,10 @@ with tabs[0]:
             # FIX: DEFAULT SELECTION FOR GIRL
             g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
-            
-            # Smart Default: If Virgo is an option, pick it. Else 0.
             try: 
-                # Find index of string starting with "Virgo" (e.g. "Virgo (Kanya)")
                 g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: 
                 g_def_idx = 0
-            
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
@@ -507,6 +495,19 @@ with tabs[0]:
         </div>
         """, unsafe_allow_html=True)
         
+        if st.session_state.api_key:
+            if st.button("🤖 Ask AI Guru for Details"):
+                with st.spinner("Consulting AI Guru..."):
+                    context_str = f"Match Context: Boy {res['b_n']}, Girl {res['g_n']}. Score: {res['score']}."
+                    if res.get('b_planets'): context_str += f" Boy Chart: {format_chart_for_ai(res['b_planets'])}."
+                    if res.get('g_planets'): context_str += f" Girl Chart: {format_chart_for_ai(res['g_planets'])}."
+                    ans = handle_ai_query("Analyze this match in detail.", context_str, st.session_state.api_key)
+                    st.session_state.messages.append({"role": "user", "content": "Analyze this match in detail."})
+                    st.session_state.messages.append({"role": "assistant", "content": ans})
+                    st.toast("✅ Analysis Ready! Switch to the AI Guru tab to read it.")
+        else:
+            st.info("ℹ️ Enter API Key in 'AI Guru' tab to enable deep analysis.")
+
         with st.expander("🧠 Show me how I concluded this"):
             st.markdown("### 1. 🤔 Thinking (Analyzing Foundation)")
             st.write(f"I started by calculating the raw Ashta Koota compatibility. The base score was {res['score']}/36.")
@@ -585,8 +586,10 @@ with tabs[2]:
         st.subheader("Lucky Month"); st.info(f"❤️ **{predict_wedding_month(r_idx)}**")
 
 with tabs[3]:
-    st.header("🤖 Guru AI"); user_key = st.secrets.get("GEMINI_API_KEY", None)
-    if not user_key: user_key = st.text_input("API Key (aistudio.google.com)", type="password")
+    st.header("🤖 Guru AI"); 
+    # Use session state for API key so it persists across tabs
+    user_key = st.text_input("API Key (aistudio.google.com)", type="password", value=st.session_state.api_key)
+    if user_key: st.session_state.api_key = user_key
     
     # CLEAR BUTTON
     if st.button("🗑️ Clear Chat History"):
@@ -594,6 +597,9 @@ with tabs[3]:
         st.rerun()
         
     context = "You are a Vedic Astrologer."
+    # DYNAMIC SUGGESTIONS
+    suggestions = ["What are the 8 Kootas?", "Meaning of Nadi Dosha?", "Best wedding colors?"]
+    
     if st.session_state.calculated: 
         r = st.session_state.results
         st.success(f"🧠 **Context Loaded:** {r['b_n']} ❤️ {r['g_n']} (Score: {r['score']})")
@@ -601,18 +607,19 @@ with tabs[3]:
         if r.get('b_planets') and r.get('g_planets'):
             b_txt = format_chart_for_ai(r['b_planets']); g_txt = format_chart_for_ai(r['g_planets'])
             context += f" Boy Chart: {b_txt}. Girl Chart: {g_txt}."
-    suggestions = ["Analyze this match", "Remedies?", "Is this good for marriage?"]
+        suggestions = ["Analyze this match", "Remedies?", "Is this good for marriage?"]
+
     cols = st.columns(3); clicked = None
     for i, s in enumerate(suggestions): 
         if cols[i%3].button(s, use_container_width=True): clicked = s
-    if user_key:
+    if st.session_state.api_key:
         for m in st.session_state.messages: st.chat_message(m["role"]).write(m["content"])
         if (prompt := st.chat_input("Ask about stars...")) or clicked:
             final_prompt = prompt if prompt else clicked
             st.session_state.messages.append({"role": "user", "content": final_prompt}); st.chat_message("user").write(final_prompt)
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
-                    ans = handle_ai_query(final_prompt, context, user_key)
+                    ans = handle_ai_query(final_prompt, context, st.session_state.api_key)
                     st.write(ans); st.session_state.messages.append({"role": "assistant", "content": ans})
 
 st.divider()
