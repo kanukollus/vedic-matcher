@@ -40,6 +40,14 @@ st.markdown("""
     }
     .pass { border-left-color: #00cc00 !important; }
     .score-pass { color: #00cc00 !important; }
+    .highlight-box {
+        background-color: #fff9c4;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+        border: 1px solid #fbc02d;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -49,10 +57,11 @@ if "results" not in st.session_state: st.session_state.results = {}
 if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
 
-# --- HELPERS & DATA (Shortened for brevity, logic remains same) ---
+# --- DATA & CONSTANTS ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
+SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
 VARNA_GROUP = [0, 1, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0]
 VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
 YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
@@ -65,7 +74,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_v24_panchang", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v26_four_tabs", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -86,7 +95,7 @@ def get_planetary_positions(date_obj, time_obj, city, country):
     dt = datetime.datetime.combine(date_obj, time_obj)
     offset, msg = get_offset_smart(city, country, dt, 5.5)
     obs = ephem.Observer(); obs.date = dt - datetime.timedelta(hours=offset)
-    obs.lat, obs.lon = '17.3850', '78.4867' # Default fallback if needed
+    obs.lat, obs.lon = '28.6139', '77.2090' # Default Delhi
     if city: 
         loc = get_cached_coords(city, country)
         if loc: obs.lat, obs.lon = str(loc.latitude), str(loc.longitude)
@@ -104,26 +113,45 @@ def get_planetary_positions(date_obj, time_obj, city, country):
 
 def get_nak_rashi(long): return int(long / 13.333333), int(long / 30)
 
-def check_mars_dosha(rashi, long):
-    m_r = int(long/30); h = (m_r - rashi)%12 + 1
-    if h in [2,4,7,8,12]:
-        if m_r in [0,7,9]: return False, f"Neutralized (House {h})"
-        return True, f"⚠️ Dosha (House {h})"
-    return False, "Safe"
+def check_mars_dosha_smart(moon_rashi, mars_long):
+    mars_rashi = int(mars_long / 30)
+    house_diff = (mars_rashi - moon_rashi) % 12 + 1
+    is_dosha_house = house_diff in [2, 4, 7, 8, 12]
+    status = "Safe"
+    if is_dosha_house:
+        if mars_rashi == 0 or mars_rashi == 7: status = f"Neutralized (Mars in Own Sign - House {house_diff})"
+        elif mars_rashi == 9: status = f"Neutralized (Mars Exalted - House {house_diff})"
+        else: return True, f"⚠️ Dosha Present (House {house_diff})"
+    return False, status
+
+def get_jupiter_position_for_year(year):
+    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
+    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
+
+def predict_marriage_luck_years(rashi_idx):
+    predictions = []
+    for year in [2025, 2026, 2027]:
+        jup_rashi = get_jupiter_position_for_year(year)
+        house = (jup_rashi - rashi_idx) % 12 + 1
+        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
+        predictions.append((year, res))
+    return predictions
+
+def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
-    # (Same Logic as v22 - Consolidating for brevity)
     maitri = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri >= 4
     score = 0; bd = []; logs = []
     
-    # Simple Loop for 8 Kootas
-    # Varna
+    # 1. Varna
     v = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
-    if v==0 and friends: v=1; logs.append("Varna boosted by Friendship")
-    score+=v; bd.append(("Varna", v, 1, "Natural" if v==1 else "Mismatch"))
+    if v==0 and friends: v=1; logs.append("Varna boosted by Friendship (Maitri)")
+    score+=v; bd.append(("Varna", v, 1, "Natural Match" if v==1 else "Mismatch"))
     
-    # Vashya
+    # 2. Vashya
     va = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va = 1 
@@ -131,35 +159,35 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     if va<2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): va=2; logs.append("Vashya boosted by Friendship/Yoni")
     score+=va; bd.append(("Vashya", va, 2, "Magnetic" if va>=1 else "Mismatch"))
     
-    # Tara
+    # 3. Tara
     cnt = (b_nak - g_nak)%27 + 1
     t = 3 if cnt%9 not in [3,5,7] else 0
-    if t==0 and friends: t=3; logs.append("Tara boosted by Friendship")
+    if t==0 and friends: t=3; logs.append("Tara boosted by Friendship (Maitri)")
     score+=t; bd.append(("Tara", t, 3, "Benefic" if t==3 else "Malefic"))
     
-    # Yoni
+    # 4. Yoni
     y = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_raw = y
     if y<4 and (friends or va>=1): y=4; logs.append("Yoni mismatch ignored due to Love/Magnetism")
-    score+=y; bd.append(("Yoni", y, 4, "Perfect" if y_raw==4 else "Compensated"))
+    score+=y; bd.append(("Yoni", y, 4, "Perfect Match" if y_raw==4 else "Compensated"))
     
-    # Maitri
+    # 5. Maitri
     m = maitri
     score+=m; bd.append(("Maitri", m, 5, "Friendly" if m>=4 else "Enemy"))
     
-    # Gana
+    # 6. Gana
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga = 6 if gb==gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else 1)
     if ga<6 and friends: ga=6; logs.append("Gana boosted by Friendship")
     score+=ga; bd.append(("Gana", ga, 6, "Match" if ga==6 else "Compensated"))
     
-    # Bhakoot
+    # 7. Bhakoot
     dist = (b_rashi-g_rashi)%12
     bh = 7 if dist not in [1,11,4,8,5,7] else 0
     if bh==0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): bh=7; logs.append("Bhakoot boosted by Friendship/Nadi")
     score+=bh; bd.append(("Bhakoot", bh, 7, "Love Flow" if bh==7 else "Blocked"))
     
-    # Nadi
+    # 8. Nadi
     n = 8
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
         n = 0
@@ -168,20 +196,24 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
         elif friends: n=8; logs.append("Nadi Dosha Cancelled by Friendship")
     score+=n; bd.append(("Nadi", n, 8, "Healthy" if n==8 else "Dosha"))
 
-    return score, bd, logs
+    # South Indian Checks
+    rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
+    rajju_status = "Fail" if rajju_group[b_nak] == rajju_group[g_nak] else "Pass"
+    if rajju_status == "Fail" and (friends or b_rashi == g_rashi): rajju_status = "Cancelled"
+    
+    vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
+    for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
+    vedha_status = "Fail" if vedha_pairs.get(g_nak) == b_nak else "Pass"
+
+    return score, bd, logs, rajju_status, vedha_status
 
 def get_daily_panchang():
-    # Toothbrush Feature: Daily Calc
     now = datetime.datetime.now()
-    s_moon, _, s_sun, _ = get_planetary_positions(now.date(), now.time(), "Delhi", "India") # Default to Delhi if unknown
-    
-    # Tithi Calc (Moon - Sun) / 12
+    s_moon, _, s_sun, _ = get_planetary_positions(now.date(), now.time(), "Delhi", "India")
     diff = (s_moon - s_sun) % 360
     tithi_num = int(diff / 12) + 1
     paksha = "Shukla" if tithi_num <= 15 else "Krishna"
     tithi_name = f"Tithi {tithi_num} ({paksha})"
-    
-    # Nakshatra
     nak_idx = int(s_moon / 13.333333)
     return tithi_name, NAKSHATRAS[nak_idx]
 
@@ -195,10 +227,10 @@ with c_reset:
         st.session_state.calculated = False
         st.rerun()
 
-# --- TABS ---
-tabs = st.tabs(["❤️ Matcher", "📅 Daily Guide", "🤖 Guru AI"])
+# --- 4 DISTINCT TABS ---
+tabs = st.tabs(["❤️ Match", "🌅 Daily Guide", "💍 Wedding Dates", "🤖 Guru AI"])
 
-# --- TAB 1: MATCHER ---
+# --- TAB 1: MATCH ---
 with tabs[0]:
     input_method = st.radio("Mode:", ["Birth Details", "Direct Star Entry"], horizontal=True, key="input_mode")
     
@@ -211,8 +243,8 @@ with tabs[0]:
             b_city = st.text_input("City", "Hyderabad", key="b_c")
         with c2:
             st.markdown("### 👰 Girl")
-            g_date = st.date_input("Date", datetime.date(1996,1,1), key="g_d")
-            g_time = st.time_input("Time", datetime.time(10,0), key="g_t")
+            g_date = st.date_input("Date", datetime.date(1994,11,28), key="g_d")
+            g_time = st.time_input("Time", datetime.time(7,30), key="g_t")
             g_city = st.text_input("City", "Hyderabad", key="g_c")
     else:
         c1, c2 = st.columns(2)
@@ -221,9 +253,11 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=5, key="g_s")
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
-            g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, key="g_r")
+            try: g_def_idx = g_rashi_opts.index("Virgo (Kanya)")
+            except: g_def_idx = 0
+            g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
         try:
@@ -233,22 +267,26 @@ with tabs[0]:
                     g_moon, g_mars_l, _, _ = get_planetary_positions(g_date, g_time, g_city, "India")
                     b_nak, b_rashi = get_nak_rashi(b_moon)
                     g_nak, g_rashi = get_nak_rashi(g_moon)
+                    b_mars = check_mars_dosha_smart(b_rashi, b_mars_l)
+                    g_mars = check_mars_dosha_smart(g_rashi, g_mars_l)
                 else:
                     b_nak = NAKSHATRAS.index(b_star); b_rashi = RASHIS.index(b_rashi_sel)
                     g_nak = NAKSHATRAS.index(g_star); g_rashi = RASHIS.index(g_rashi_sel)
+                    b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
-                score, breakdown, logs = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
+                score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
                 st.session_state.results = {"score": score, "bd": breakdown, "logs": logs, 
-                                            "b_n": NAKSHATRAS[b_nak], "g_n": NAKSHATRAS[g_nak]}
+                                            "b_n": NAKSHATRAS[b_nak], "g_n": NAKSHATRAS[g_nak],
+                                            "b_prof": NAK_TRAITS.get(b_nak), "g_prof": NAK_TRAITS.get(g_nak),
+                                            "b_mars": b_mars, "g_mars": g_mars, "rajju": rajju, "vedha": vedha}
                 st.session_state.calculated = True
         except Exception as e: st.error(f"Error: {e}")
 
-    # --- MOBILE FRIENDLY RESULTS ---
+    # --- RESULTS UI ---
     if st.session_state.calculated:
         res = st.session_state.results
         st.markdown("---")
         
-        # HEADLINE SCORE
         col_score, col_gauge = st.columns([1,1])
         with col_score:
             st.markdown(f"<h1 style='text-align: center; color: #ff4b4b; margin:0;'>{res['score']}</h1>", unsafe_allow_html=True)
@@ -263,18 +301,15 @@ with tabs[0]:
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
 
-        # TOOTHBRUSH FEATURE: WHATSAPP SHARE TEXT
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
         st.caption("👆 Copy to share on WhatsApp")
 
-        # MOBILE CARDS (THE FIX FOR TABLES)
         st.markdown("### 📋 Detailed Analysis")
         for item in res['bd']:
             attr, pts, max_pts, reason = item
             border_class = "pass" if pts == max_pts else "fail"
             text_class = "score-pass" if pts == max_pts else ""
-            
             st.markdown(f"""
             <div class="guna-card {border_class}">
                 <div class="guna-header">
@@ -285,17 +320,23 @@ with tabs[0]:
             </div>
             """, unsafe_allow_html=True)
             
-        if res['logs']:
-            with st.expander("✨ Astrologer's Notes (Dosha Cancellations)"):
-                for log in res['logs']: st.write(f"• {log}")
+        with st.expander("🪐 Mars & Dosha Analysis"):
+            st.write(f"**Rajju:** {res['rajju']} (Body Check)")
+            st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
+            st.write(f"**Boy Mars:** {res['b_mars'][1]}")
+            st.write(f"**Girl Mars:** {res['g_mars'][1]}")
+            if res['logs']:
+                st.markdown("#### ✨ Cancellations Applied")
+                for log in res['logs']: st.caption(f"• {log}")
 
-# --- TAB 2: DAILY GUIDE (TOOTHBRUSH) ---
+# --- TAB 2: DAILY GUIDE ---
 with tabs[1]:
-    st.header("📅 Today's Guide")
+    st.header("🌅 Daily Guide")
+    st.caption("Start your day with cosmic alignment.")
     tithi, nak = get_daily_panchang()
     
     st.markdown(f"""
-    <div style="padding: 20px; background-color: #fff9c4; border-radius: 10px; text-align: center;">
+    <div class="highlight-box">
         <h3>Today's Nakshatra</h3>
         <h1 style="color: #ff9800;">{nak}</h1>
         <hr>
@@ -304,18 +345,29 @@ with tabs[1]:
     </div>
     """, unsafe_allow_html=True)
     
-    
-    
-    st.info("💡 **Tip:** Avoid starting new ventures during Rahu Kalam (Calculated for your location).")
-    
-    # Placeholder for daily transit
-    st.markdown("### 🔮 Your Daily Vibe")
-    st.caption("Select your Rashi to see how today looks for you.")
-    user_rashi = st.selectbox("My Rashi", RASHIS)
-    st.success(f"Moon is currently transiting. {user_rashi} natives might feel energetic today!")
+    st.info("💡 **Tip:** Avoid starting new ventures during Rahu Kalam (check local time).")
 
-# --- TAB 3: AI ---
+# --- TAB 3: WEDDING DATES ---
 with tabs[2]:
+    st.header("💍 Wedding Dates")
+    st.caption("Find auspicious timelines for the couple.")
+    
+    t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
+    
+    if st.button("Check Auspicious Dates"):
+        r_idx = RASHIS.index(t_rashi)
+        
+        st.subheader("Lucky Years (Jupiter)")
+        for y, s in predict_marriage_luck_years(r_idx):
+            icon = "✅" if "Excellent" in s else "😐"
+            st.write(f"**{y}:** {icon} {s}")
+        
+        st.subheader("Lucky Month (Sun)")
+        st.info(f"❤️ **{predict_wedding_month(r_idx)}** (Recurring Annually)")
+    
+
+# --- TAB 4: AI GURU ---
+with tabs[3]:
     st.header("🤖 Guru AI")
     user_key = st.text_input("API Key", type="password")
     if user_key and (query := st.chat_input("Ask about today's stars...")):
