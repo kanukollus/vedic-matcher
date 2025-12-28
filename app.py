@@ -12,11 +12,13 @@ import google.generativeai as genai
 # --- PAGE CONFIG (Mobile Friendly) ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
 
-# --- CSS FOR MOBILE CARDS ---
+# --- CSS FOR MOBILE CARDS (FIXED VISIBILITY) ---
 st.markdown("""
 <style>
+    /* Force text color to black because background is hardcoded light gray */
     .guna-card {
         background-color: #f0f2f6;
+        color: #31333F; 
         padding: 15px;
         border-radius: 10px;
         margin-bottom: 10px;
@@ -27,23 +29,30 @@ st.markdown("""
         font-weight: bold;
         display: flex;
         justify-content: space-between;
+        color: #31333F; /* Ensure header title is visible in dark mode */
     }
     .guna-score {
         font-weight: bold;
     }
     .guna-reason {
         font-size: 14px;
-        color: #555;
+        color: #555; /* Dark grey for subtitle */
         margin-top: 5px;
         font-style: italic;
     }
-    /* Dynamic Border Colors */
+    
+    /* Dynamic Colors for Borders & Scores */
     .border-red { border-left-color: #ff4b4b !important; }
     .border-orange { border-left-color: #ffa500 !important; }
     .border-green { border-left-color: #00cc00 !important; }
     
+    .text-red { color: #ff4b4b !important; }
+    .text-orange { color: #ffa500 !important; }
+    .text-green { color: #00cc00 !important; }
+    
     .highlight-box {
         background-color: #fff9c4;
+        color: #31333F; /* Ensure text visibility */
         padding: 15px;
         border-radius: 10px;
         text-align: center;
@@ -76,7 +85,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v28_colors", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v29_final_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -143,7 +152,7 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- TRANSPARENCY CALCULATION LOGIC ---
+# --- CALCULATION LOGIC ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
@@ -342,6 +351,10 @@ with tabs[0]:
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
+            
+
+[Image of gauge chart]
+
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
@@ -351,8 +364,18 @@ with tabs[0]:
         st.markdown("### 📋 Quick Scan")
         for item in res['bd']:
             attr, raw, final, max_pts, reason = item
-            border_class = "border-green" if final == max_pts else ("border-orange" if final > 0 else "border-red")
-            text_class = "score-pass" if final == max_pts else ""
+            
+            # Logic for Card Styling (Green if full points, Orange if partial, Red if 0)
+            if final == max_pts:
+                border_class = "border-green"
+                text_class = "text-green"
+            elif final > 0:
+                border_class = "border-orange"
+                text_class = "text-orange"
+            else:
+                border_class = "border-red"
+                text_class = "text-red"
+
             st.markdown(f"""
             <div class="guna-card {border_class}">
                 <div class="guna-header">
