@@ -82,7 +82,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v44_1_final_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v45_final_ui", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -374,6 +374,7 @@ with tabs[0]:
         st.markdown("---")
         pro_mode = st.toggle("✨ Generate Full Horoscopes (Pro Feature)")
     else:
+        st.info("ℹ️ **Note:** Advanced Horoscope features are available only with full Birth Details.")
         c1, c2 = st.columns(2)
         with c1:
             b_star = st.selectbox("Boy Star", NAKSHATRAS, key="b_s")
@@ -441,7 +442,6 @@ with tabs[0]:
         st.code(share_text, language="text")
         st.caption("👆 Copy to share on WhatsApp")
         
-        # --- AI ASTROLOGER VERDICT ---
         st.markdown(f"""
         <div class="verdict-box">
             <div class="verdict-title">🤖 AI Astrologer's Verdict</div>
@@ -449,7 +449,6 @@ with tabs[0]:
         </div>
         """, unsafe_allow_html=True)
         
-        # --- SHOW ME HOW ---
         with st.expander("🧠 Show me how I concluded this"):
             st.markdown("### 1. 🤔 Thinking (Analyzing Foundation)")
             st.write(f"I started by calculating the raw Ashta Koota compatibility. The base score was {res['score']}/36.")
