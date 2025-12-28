@@ -70,7 +70,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v41_context_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v42_ai_context_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -271,17 +271,15 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
-# --- NEW: CHART FORMATTER FOR AI ---
+# --- CHART FORMATTER FOR AI ---
 def format_chart_for_ai(chart_data):
     if not chart_data: return "Chart not generated."
     readable = []
     for rashi_idx, planets in chart_data.items():
-        if planets:
-            readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
     return "; ".join(readable)
 
-# --- ROBUST AI HANDLER ---
-# --- ROBUST AI HANDLER WITH QUOTA CHECK ---
+# --- ROBUST AI HANDLER (QUOTA & 404 SAFE) ---
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
@@ -301,11 +299,8 @@ def handle_ai_query(prompt, context_str, key):
                 chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
                 return chat.send_message(prompt).text
             except Exception as e:
-                # Check for Quota Error specifically
-                if "429" in str(e):
-                    return "⚠️ **Quota Exceeded:** The free AI limit has been reached. Please wait 1 minute and try again."
-                last_err = e
-                continue
+                if "429" in str(e): return "⚠️ **Quota Exceeded:** Please wait 60s."
+                last_err = e; continue
         return f"AI Error: {last_err}"
     except Exception as e: return f"Error: {e}"
 
@@ -457,20 +452,30 @@ with tabs[3]:
     st.header("🤖 Guru AI"); user_key = st.secrets.get("GEMINI_API_KEY", None)
     if not user_key: user_key = st.text_input("API Key (aistudio.google.com)", type="password")
     
-    # NEW: CONTEXT BUILDER WITH CHARTS
+    # Context State
     context = "You are a Vedic Astrologer."
+    suggestions = ["Best wedding colors?", "What is Nadi Dosha?", "Explain Rajju Dosha"]
+    
     if st.session_state.calculated: 
         r = st.session_state.results
+        # Visual Banner (Feature 1)
+        st.success(f"🧠 **Context Loaded:** {r['b_n']} ❤️ {r['g_n']} (Score: {r['score']})")
+        
+        # Build Context (Feature 3: Charts)
         context += f" Match Context: Boy {r['b_n']}, Girl {r['g_n']}. Score: {r['score']}/36."
         if r.get('b_planets') and r.get('g_planets'):
             b_txt = format_chart_for_ai(r['b_planets'])
             g_txt = format_chart_for_ai(r['g_planets'])
             context += f" Boy Chart: {b_txt}. Girl Chart: {g_txt}."
             
-    suggestions = ["Analyze this match", "Remedies?", "Is this good for marriage?"]
+        # Dynamic Prompts (Feature 2)
+        suggestions = ["Analyze this match detailed", "Any remedies needed?", "Is this good for marriage?"]
+        if r['rajju'] == "Fail": suggestions.append("Remedies for Rajju Dosha")
+
     cols = st.columns(3); clicked = None
     for i, s in enumerate(suggestions): 
         if cols[i%3].button(s, use_container_width=True): clicked = s
+        
     if user_key:
         for m in st.session_state.messages: st.chat_message(m["role"]).write(m["content"])
         if (prompt := st.chat_input("Ask about stars...")) or clicked:
@@ -481,7 +486,7 @@ with tabs[3]:
                     ans = handle_ai_query(final_prompt, context, user_key)
                     st.write(ans); st.session_state.messages.append({"role": "assistant", "content": ans})
 
-# --- RESTORED FULL FOOTER ---
+# --- RESTORED FOOTER ---
 st.divider()
 with st.expander("ℹ️ How to Read Results & Disclaimer"):
     st.markdown("""
