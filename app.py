@@ -152,7 +152,7 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- CALCULATION LOGIC ---
+# --- TRANSPARENCY CALCULATION LOGIC ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
@@ -351,10 +351,6 @@ with tabs[0]:
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
-            
-
-[Image of gauge chart]
-
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
@@ -365,7 +361,7 @@ with tabs[0]:
         for item in res['bd']:
             attr, raw, final, max_pts, reason = item
             
-            # Logic for Card Styling (Green if full points, Orange if partial, Red if 0)
+            # Logic for Card Styling
             if final == max_pts:
                 border_class = "border-green"
                 text_class = "text-green"
