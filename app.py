@@ -66,7 +66,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v36_dynamic_ai", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v37_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -100,6 +100,7 @@ def get_planetary_positions(date_obj, time_obj, city, country):
     s_moon = (math.degrees(ephem.Ecliptic(moon).lon) - ayanamsa) % 360
     s_mars = (math.degrees(ephem.Ecliptic(mars).lon) - ayanamsa) % 360
     s_sun = (math.degrees(ephem.Ecliptic(sun).lon) - ayanamsa) % 360
+    
     return s_moon, s_mars, s_sun, msg
 
 def get_nak_rashi(long): return int(long / 13.333333), int(long / 30)
@@ -132,7 +133,7 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- CORE CALCULATION ENGINE ---
+# --- CORE CALCULATION ENGINE WITH CITATIONS ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
@@ -407,10 +408,6 @@ with tabs[0]:
             fig = go.Figure(go.Indicator(mode = "gauge", value = res['score'], gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
-            
-
-[Image of gauge chart]
-
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
