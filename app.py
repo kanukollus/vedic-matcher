@@ -47,6 +47,12 @@ st.markdown("""
         background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20;
     }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+    
+    /* SHOW ME HOW STEPS */
+    .step-box {
+        margin-bottom: 15px; padding-left: 15px; border-left: 3px solid #ddd;
+    }
+    .step-title { font-weight: bold; color: #333; margin-bottom: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -76,7 +82,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v43_senior_astro", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v44_transparency_ui", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -160,59 +166,35 @@ def render_south_indian_chart(positions, title):
         <div class="chart-box" style="grid-column: 4; grid-row: 4;">{grid_items[15]}<br><span style='font-size:8px; color:grey'>Virgo</span></div>
     </div>"""
 
-# --- NEW: ANALYTICS ENGINE (THE SENIOR ASTROLOGER) ---
+# --- ANALYTICS ENGINE (AI ASTROLOGER) ---
 def analyze_chandra_kundali(chart_data, moon_rashi):
-    # This function analyzes the chart relative to the Moon (Chandra Lagna)
-    # Target: 7th House from Moon (Marriage House)
     if not chart_data: return []
-    
     house_7_idx = (moon_rashi + 6) % 12
     planets_in_7 = chart_data.get(house_7_idx, [])
-    
     observations = []
     
-    # 1. Check for Malefics in 7th
     malefics = [p for p in planets_in_7 if p in ["Sa", "Ma", "Ra", "Ke", "Su"]]
-    if malefics:
-        names = ", ".join(malefics)
-        observations.append(f"⚠️ **Stress:** {names} in 7th House from Moon. Indicates delays or friction.")
-        
-    # 2. Check for Benefics in 7th
-    benefics = [p for p in planets_in_7 if p in ["Ju", "Ve", "Me"]]
-    if benefics:
-        names = ", ".join(benefics)
-        observations.append(f"✅ **Grace:** {names} in 7th House. Indicates support and harmony.")
-        
-    # 3. Check 7th Lord Position (Simplified: Just checking if it's in 6/8/12 from Moon)
-    # (Skipped for brevity in this version to avoid complexity, focusing on occupation)
+    if malefics: observations.append(f"⚠️ **Stress:** {', '.join(malefics)} in 7th House.")
     
-    if not planets_in_7:
-        observations.append("ℹ️ **Empty 7th House:** The marriage house is unoccupied (Neutral/Good).")
-        
+    benefics = [p for p in planets_in_7 if p in ["Ju", "Ve", "Me"]]
+    if benefics: observations.append(f"✅ **Grace:** {', '.join(benefics)} in 7th House.")
+    
+    if not planets_in_7: observations.append("ℹ️ **Empty 7th House:** Neutral/Good.")
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs):
     verdict = ""
-    
-    # 1. Quantitative Verdict
     if score >= 25: verdict += "This is mathematically an **Excellent Match**."
     elif score >= 18: verdict += "This is a **Good Match** compatible for marriage."
     else: verdict += "This match has **Low Compatibility** scores."
     
-    # 2. Dosha Verdict
-    if rajju == "Fail": verdict += " However, **Rajju Dosha** (Physical/Health) is a major concern that requires remedy."
-    elif rajju == "Cancelled": verdict += " Although Rajju Dosha exists, it is **cancelled** by other strengths."
+    if rajju == "Fail": verdict += " However, **Rajju Dosha** is a concern."
+    elif rajju == "Cancelled": verdict += " Rajju Dosha is **cancelled** by strengths."
     
-    # 3. Planetary Verdict
-    verdict += "\n\n**Planetary Deep Dive:** "
-    if any("Stress" in o for o in b_obs + g_obs):
-        verdict += "While the stars match, the planetary positions indicate some challenges. "
-        verdict += "Specifically, the influence on the 7th house suggests patience is needed."
-    elif any("Grace" in o for o in b_obs + g_obs):
-        verdict += "The planetary positions are supportive, adding a layer of grace to the relationship beyond just the score."
-    else:
-        verdict += "The planetary positions are neutral, meaning the relationship will largely depend on the couple's maturity."
-        
+    verdict += "\n\n**Planetary Context:** "
+    if any("Stress" in o for o in b_obs + g_obs): verdict += "Planetary challenges in the 7th house suggest patience is needed."
+    elif any("Grace" in o for o in b_obs + g_obs): verdict += "Planetary positions add grace and harmony to the bond."
+    else: verdict += "Planetary positions are neutral."
     return verdict
 
 # --- CALCULATION ENGINE ---
@@ -421,7 +403,6 @@ with tabs[0]:
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
                 
-                # --- NEW ANALYTICS ---
                 b_obs = analyze_chandra_kundali(b_planets, b_rashi) if b_planets else []
                 g_obs = analyze_chandra_kundali(g_planets, g_rashi) if g_planets else []
                 human_verdict = generate_human_verdict(score, rajju, b_obs, g_obs)
@@ -455,30 +436,52 @@ with tabs[0]:
             fig = go.Figure(go.Indicator(mode = "gauge", value = res['score'], gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
+            
+
+[Image of gauge chart]
+ # removed
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
         st.caption("👆 Copy to share on WhatsApp")
         
-        # --- SENIOR ASTROLOGER VERDICT ---
         st.markdown(f"""
         <div class="verdict-box">
-            <div class="verdict-title">📝 Senior Astrologer's Verdict</div>
+            <div class="verdict-title">🤖 AI Astrologer's Verdict</div>
             {res['verdict']}
         </div>
         """, unsafe_allow_html=True)
         
-        if res['b_obs'] or res['g_obs']:
-            with st.expander("🔍 Deep Planetary Analysis (Chandra Kundali)"):
-                c_o1, c_o2 = st.columns(2)
-                with c_o1:
-                    st.caption("Boy's 7th House (Marriage)")
-                    if not res['b_obs']: st.info("No major malefic/benefic influence.")
-                    for o in res['b_obs']: st.write(o)
-                with c_o2:
-                    st.caption("Girl's 7th House (Marriage)")
-                    if not res['g_obs']: st.info("No major malefic/benefic influence.")
-                    for o in res['g_obs']: st.write(o)
+        # --- SHOW ME HOW ---
+        with st.expander("🧠 Show me how I concluded this"):
+            st.markdown("### 1. 🤔 Thinking (Analyzing Foundation)")
+            st.write(f"I started by calculating the raw Ashta Koota compatibility. The base score was {res['score']}/36.")
+            
+            st.markdown("### 2. ⚙️ Harnessing (Applying Ancient Rules)")
+            if res['logs']:
+                st.write(f"I found {len(res['logs'])} critical Doshas that were **cancelled** or modified by special rules from texts like *Muhurtha Chintamani*:")
+                for l in res['logs']: st.caption(f"- {l['title']}: {l['text']}")
+            else:
+                st.write("No special cancellation rules were needed. The score is straightforward.")
+                
+            st.markdown("### 3. 🧵 Stitching (Planetary Context)")
+            if res['b_obs'] or res['g_obs']:
+                st.write("I analyzed the **Chandra Kundali** (Moon Chart) to see the actual planetary influence on the 7th House (Marriage):")
+                if res['b_obs']: st.caption(f"**Boy:** {'; '.join(res['b_obs'])}")
+                if res['g_obs']: st.caption(f"**Girl:** {'; '.join(res['g_obs'])}")
+            else:
+                st.write("Planetary chart analysis was either skipped (Basic Mode) or showed no major planetary interference.")
+                
+            st.markdown("### 4. ✨ Concluding")
+            st.write("Synthesizing the score, dosha checks, and planetary alignment, I generated the final verdict above.")
+
+        if res.get('b_planets') and res.get('g_planets'):
+            st.markdown("### 🔮 Pro: Planetary Charts")
+            c_h1, c_h2 = st.columns(2)
+            with c_h1: st.markdown(render_south_indian_chart(res['b_planets'], "Boy's Rashi Chart"), unsafe_allow_html=True)
+            with c_h2: st.markdown(render_south_indian_chart(res['g_planets'], "Girl's Rashi Chart"), unsafe_allow_html=True)
+        elif input_method == "Birth Details" and not res.get('b_planets'):
+            st.info("💡 Tip: Enable 'Generate Full Horoscopes' to see visual charts.")
 
         st.markdown("### 📋 Quick Scan")
         for item in res['bd']:
@@ -496,14 +499,6 @@ with tabs[0]:
             with st.expander("📜 Ancient Wisdom & Cancellations (Dosha Bhanga)"):
                 st.table(pd.DataFrame(res['logs']))
         
-        if res.get('b_planets') and res.get('g_planets'):
-            st.markdown("### 🔮 Pro: Planetary Charts")
-            c_h1, c_h2 = st.columns(2)
-            with c_h1: st.markdown(render_south_indian_chart(res['b_planets'], "Boy's Rashi Chart"), unsafe_allow_html=True)
-            with c_h2: st.markdown(render_south_indian_chart(res['g_planets'], "Girl's Rashi Chart"), unsafe_allow_html=True)
-        elif input_method == "Birth Details" and not res.get('b_planets'):
-            st.info("💡 Tip: Enable 'Generate Full Horoscopes' to see visual charts.")
-
         with st.expander("🪐 Mars & Dosha Analysis"):
             st.write(f"**Rajju:** {res['rajju']} (Body Check)"); st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
             bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
@@ -530,7 +525,7 @@ with tabs[1]:
 with tabs[2]:
     st.header("💍 Wedding Dates"); t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
     if st.button("Check Auspicious Dates"):
-        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years")
+        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years"); 
         for y, s in predict_marriage_luck_years(r_idx): st.write(f"**{y}:** {s}")
         st.subheader("Lucky Month"); st.info(f"❤️ **{predict_wedding_month(r_idx)}**")
 
