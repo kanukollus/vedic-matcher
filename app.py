@@ -24,9 +24,6 @@ st.markdown("""
     .border-green { border-left-color: #00cc00 !important; }
     .border-orange { border-left-color: #ffa500 !important; }
     .border-red { border-left-color: #ff4b4b !important; }
-    .text-green { color: #00cc00 !important; }
-    .text-orange { color: #ffa500 !important; }
-    .text-red { color: #ff4b4b !important; }
     
     .chart-container {
         display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px);
@@ -59,6 +56,12 @@ NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
 RASHIS = ["Aries", "Taurus", "Gemini", "Cancer","Leo", "Virgo", "Libra", "Scorpio","Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 SOUTH_CHART_MAP = {11: 0, 0: 1, 1: 2, 2: 3, 10: 4, 3: 7, 9: 8, 4: 11, 8: 12, 7: 13, 6: 14, 5: 15}
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
+SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
+VARNA_GROUP = [0, 1, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0]
+VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
+YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
+YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
+RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
 MAITRI_TABLE = [[5, 5, 5, 4, 5, 0, 0], [5, 5, 4, 1, 4, 1, 1], [5, 4, 5, 0.5, 5, 3, 0.5],[4, 1, 0.5, 5, 0.5, 5, 4], [5, 4, 5, 0.5, 5, 0.5, 3], [0, 1, 3, 5, 0.5, 5, 5], [0, 1, 0.5, 4, 3, 5, 5]]
 GANA_TYPE = [0, 1, 2, 1, 0, 1, 0, 0, 2, 2, 1, 1, 0, 2, 0, 2, 0, 2, 2, 1, 1, 0, 2, 2, 1, 1, 0]
 GANA_NAMES = ["Deva (Divine)", "Manushya (Human)", "Rakshasa (Demon)"]
@@ -66,18 +69,13 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 NADI_NAMES = ["Adi (Start)", "Madhya (Middle)", "Antya (End)"]
 SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shravana", "Uttara Bhadrapada", "Revati"]
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
-VARNA_GROUP = [0, 1, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0]
-VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
-YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
-YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
-RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
 
-# --- UTILS ---
+# --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v48_meaningful_insights", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v49_quota_saver", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -162,7 +160,6 @@ def render_south_indian_chart(positions, title):
         <div class="chart-box" style="grid-column: 4; grid-row: 4;">{grid_items[15]}<br><span style='font-size:8px; color:grey'>Virgo</span></div>
     </div>"""
 
-# --- NEW: MEANINGFUL INTERPRETATION ENGINE ---
 def calculate_current_dasha(moon_long, birth_date):
     nak_idx = int(moon_long / 13.333333)
     deg_in_nak = moon_long % 13.333333
@@ -171,16 +168,13 @@ def calculate_current_dasha(moon_long, birth_date):
     start_lord = DASHA_ORDER[lord_seq_idx]
     total_years = DASHA_YEARS[start_lord]
     balance_years = total_years * (1 - fraction_passed)
-    
     current_date = datetime.date.today()
     birth_dt = datetime.date(birth_date.year, birth_date.month, birth_date.day)
     age_days = (current_date - birth_dt).days
     age_years = age_days / 365.25
-    
     curr_lord = start_lord
     rem_balance = balance_years
-    if age_years < rem_balance: return curr_lord
-    
+    if age_years < rem_balance: return curr_lord, "Growth & Foundation"
     age_years -= rem_balance
     curr_idx = lord_seq_idx
     while True:
@@ -189,24 +183,28 @@ def calculate_current_dasha(moon_long, birth_date):
         years = DASHA_YEARS[curr_lord]
         if age_years < years: break
         age_years -= years
-    return curr_lord
+    tones = {
+        "Jupiter": "Wisdom & Expansion", "Saturn": "Maturity & Discipline",
+        "Mercury": "Communication & Business", "Ketu": "Introspection & Spirituality",
+        "Venus": "Love & Comfort", "Sun": "Authority & Career",
+        "Moon": "Emotional Depth", "Mars": "Energy & Action",
+        "Rahu": "Ambition & Unconventional Growth"
+    }
+    return curr_lord, tones.get(curr_lord, "General Growth")
 
 def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
-    # Returns rich text interpretation instead of raw data
     if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
     
-    # 1. Occupation
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
         if any(p in ["Sat", "Mars", "Rahu", "Ketu", "Sun"] for p in occupants):
-            observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity to handle disagreements without ego.")
+            observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity.")
         elif any(p in ["Jup", "Ven", "Merc"] for p in occupants):
-            observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony, wisdom, and affection to the partnership.")
+            observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony and affection.")
             
-    # 2. Aspects
     aspectors = []
     for r_idx, planets in chart_data.items():
         dist = (house_7_idx - r_idx) % 12 + 1 
@@ -216,45 +214,31 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
                 
     if aspectors:
         aspectors = list(set(aspectors))
-        if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn is looking at the marriage house. This doesn't mean 'bad', but it means the relationship will mature *slowly*. Rush decisions can lead to regret.")
-        if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds high energy to the bond. This creates passion but also 'heat'. Arguments can escalate quickly if egos aren't checked.")
-        if "Jup" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage. Even if there are other flaws, Jupiter's aspect acts as a divine safety net.")
+        if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
+        if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds energy and passion, but arguments can get heated.")
+        if "Jup" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
         
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     verdict = ""
-    # 1. Score Interpretation
-    if score >= 25: verdict += "Mathematically, this is an **Excellent Match** (score > 25). The foundational compatibility is very strong."
-    elif score >= 18: verdict += "Mathematically, this is a **Good Match** (score 18-24). The foundation is stable enough for marriage."
-    else: verdict += "Mathematically, the compatibility score is **Below Average**. This relationship will require significant conscious effort to work."
+    if score >= 25: verdict += "Mathematically, this is an **Excellent Match** (>25 points). "
+    elif score >= 18: verdict += "Mathematically, this is a **Good Match** (18-24 points). "
+    else: verdict += "Mathematically, the compatibility score is **Below Average**. "
     
-    # 2. Critical Dosha Interpretation
-    if rajju == "Fail": verdict += " However, the **Rajju Dosha** (Physical/Health mismatch) is a red flag. In traditional astrology, this often points to health concerns for one partner."
+    if rajju == "Fail": verdict += " However, the **Rajju Dosha** (Health mismatch) is a concern that requires remedy."
     
-    # 3. Dasha Interpretation (The "So What?")
-    verdict += "\n\n**⏱️ Timing (Dasha Analysis):** "
-    if b_dasha == "Unknown":
-        verdict += "Timing analysis skipped (Basic Mode)."
-    elif b_dasha == g_dasha:
-        verdict += f"Both partners are currently running the **{b_dasha} Dasha**. ⚠️ **Dasha Sandhi Warning:** When a couple runs the same major period (especially intense ones like Rahu/Saturn), it creates a 'resonance effect'. Highs are higher, but stress is also amplified. You must support each other during transitions."
-    else:
-        verdict += f"Boy is in *{b_dasha}* period, Girl is in *{g_dasha}*. These are distinct phases, which is generally good—one can be the anchor while the other goes through changes."
+    verdict += f"\n\n**⏱️ Timing:** Boy is running *{b_dasha}*, Girl is running *{g_dasha}*. "
+    if b_dasha == g_dasha: verdict += "Running the same Dasha creates a 'resonance effect'—intense highs and lows."
+    else: verdict += "Different periods help balance each other out."
         
-    # 4. Planetary Interpretation
     verdict += "\n\n**🪐 Planetary Context:** "
     all_obs = b_obs + g_obs
-    if not all_obs:
-        verdict += "The planetary positions in the Moon Chart are largely neutral. This is good news—it means no major external astrological blocks are interfering with your free will."
-    else:
-        if any("⚠️" in o for o in all_obs):
-            verdict += "There are some planetary challenges identified (see below). These aren't 'deal breakers' but areas where you will need to apply wisdom and patience."
-        elif any("✅" in o for o in all_obs):
-            verdict += "The charts show strong supporting planetary influences that will help smooth over any rough patches."
-            
+    if not all_obs: verdict += "Planetary positions are largely neutral, meaning free will plays the biggest role."
+    elif any("⚠️" in o for o in all_obs): verdict += "There are planetary challenges (see below) requiring patience and maturity."
+    else: verdict += "Planetary influences are supportive and protective."
     return verdict
 
-# --- CORE CALCULATION ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
@@ -349,22 +333,18 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             if source_gender == "Boy": score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, r_idx)
             else: score, bd, logs, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
             raw_score = sum(item[1] for item in bd)
-            reason = logs[0]['The Fix (Cancellation)'] if logs else "Standard Match"
+            reason = logs[0]['Fix'] if logs else "Standard Match"
             if score == 36: reason = "Perfect Match!"
             matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
+# --- OPTIMIZED AI HANDLER (QUOTA SAVER) ---
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
-        try: available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        except: available_models = []
-        preferred = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro", "gemini-pro"]
-        candidates = []
-        for p in preferred:
-            for a in available_models:
-                if p in a: candidates.append(a)
-        if not candidates: candidates = preferred
+        # Optimized: No list_models call to save quota
+        # Hardcoded list of standard free-tier models
+        candidates = ["gemini-1.5-flash", "gemini-1.5-pro"]
         
         last_err = None
         for m in candidates:
@@ -373,8 +353,10 @@ def handle_ai_query(prompt, context_str, key):
                 chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
                 return chat.send_message(prompt).text
             except Exception as e:
-                if "429" in str(e): return "⚠️ **Quota Exceeded:** Please wait 60s."
-                last_err = e; continue
+                # If quota error, stop immediately. Don't retry other models.
+                if "429" in str(e): return "⚠️ **Quota Exceeded:** The free AI limit has been reached. Please wait 1 minute and try again."
+                last_err = e
+                continue
         return f"AI Error: {last_err}"
     except Exception as e: return f"Error: {e}"
 
@@ -434,8 +416,8 @@ with tabs[0]:
                     g_nak, g_rashi = get_nak_rashi(g_moon)
                     b_planets, g_planets = b_chart, g_chart
                     if pro_mode:
-                        b_dasha_name = calculate_current_dasha(b_moon, b_date)
-                        g_dasha_name = calculate_current_dasha(g_moon, g_date)
+                        b_dasha_name, b_dasha_tone = calculate_current_dasha(b_moon, b_date)
+                        g_dasha_name, g_dasha_tone = calculate_current_dasha(g_moon, g_date)
                 else:
                     b_nak = NAKSHATRAS.index(b_star); b_rashi = RASHIS.index(b_rashi_sel)
                     g_nak = NAKSHATRAS.index(g_star); g_rashi = RASHIS.index(g_rashi_sel)
@@ -458,7 +440,7 @@ with tabs[0]:
                     "rajju": rajju, "vedha": vedha,
                     "b_planets": b_planets, "g_planets": g_planets,
                     "verdict": human_verdict, "b_obs": b_obs, "g_obs": g_obs,
-                    "b_dasha": b_dasha_name, "g_dasha": g_dasha_name
+                    "b_dasha": f"{b_dasha_name} ({b_dasha_tone})", "g_dasha": f"{g_dasha_name} ({g_dasha_tone})"
                 }
                 st.session_state.calculated = True
         except Exception as e: st.error(f"Error: {e}")
@@ -544,7 +526,7 @@ with tabs[0]:
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
             st.write(f"**Boy Mars:** {bm}"); st.write(f"**Girl Mars:** {gm}")
 
-# --- OTHER TABS (Same as before) ---
+# --- OTHER TABS ---
 with tabs[1]:
     st.header("🔍 Match Finder"); st.caption("Find the best compatible stars for you.")
     col_f1, col_f2 = st.columns(2)
@@ -572,9 +554,12 @@ with tabs[3]:
     st.header("🤖 Guru AI"); user_key = st.secrets.get("GEMINI_API_KEY", None)
     if not user_key: user_key = st.text_input("API Key (aistudio.google.com)", type="password")
     
+    # CLEAR BUTTON (Fix for stuck error history)
+    if st.button("🗑️ Clear Chat History"):
+        st.session_state.messages = []
+        st.rerun()
+        
     context = "You are a Vedic Astrologer."
-    suggestions = ["Best wedding colors?", "Remedies for Nadi Dosha?", "Explain Rajju Dosha"]
-    
     if st.session_state.calculated: 
         r = st.session_state.results
         st.success(f"🧠 **Context Loaded:** {r['b_n']} ❤️ {r['g_n']} (Score: {r['score']})")
@@ -582,9 +567,7 @@ with tabs[3]:
         if r.get('b_planets') and r.get('g_planets'):
             b_txt = format_chart_for_ai(r['b_planets']); g_txt = format_chart_for_ai(r['g_planets'])
             context += f" Boy Chart: {b_txt}. Girl Chart: {g_txt}."
-        suggestions = ["Analyze this match detailed", "Any remedies needed?", "Is this good for marriage?"]
-        if r['rajju'] == "Fail": suggestions.append("Remedies for Rajju Dosha")
-
+    suggestions = ["Analyze this match", "Remedies?", "Is this good for marriage?"]
     cols = st.columns(3); clicked = None
     for i, s in enumerate(suggestions): 
         if cols[i%3].button(s, use_container_width=True): clicked = s
