@@ -40,6 +40,16 @@ st.markdown("""
     .text-red { color: #ff4b4b !important; }
     .text-orange { color: #ffa500 !important; }
     .text-green { color: #00cc00 !important; }
+    
+    .highlight-box {
+        background-color: #fff9c4;
+        color: #31333F;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin-bottom: 10px;
+        border: 1px solid #fbc02d;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,7 +76,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v34_final_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v35_robust_ai", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -280,32 +290,25 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             })
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
-# --- ROBUST AI HANDLER (FIX FOR 404 ERROR) ---
+# --- ROBUST AI HANDLER (TRY-ALL LOOP) ---
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
+        # Try a prioritized list of models
+        candidates = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro", "gemini-pro"]
         
-        # Self-Healing Model Selection
-        active_model = "gemini-1.5-flash" # Default preference
-        try:
-            # Check available models to avoid 404
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            
-            # Smart Fallback logic
-            if "models/gemini-1.5-flash" in available_models:
-                active_model = "gemini-1.5-flash"
-            elif "models/gemini-pro" in available_models:
-                active_model = "gemini-pro"
-            elif available_models:
-                active_model = available_models[0].name # Just pick the first working one
-        except:
-            # If list_models fails (network/permissions), default to pro (often safer on older SDKs)
-            active_model = "gemini-pro"
-
-        model = genai.GenerativeModel(active_model)
-        chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I understand. I am your Vedic Astrology Guru."]}])
-        return chat.send_message(prompt).text
-    except Exception as e: return f"AI Error: {e}"
+        last_error = None
+        for model_name in candidates:
+            try:
+                model = genai.GenerativeModel(model_name)
+                chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I understand. I am your Vedic Astrology Guru."]}])
+                return chat.send_message(prompt).text
+            except Exception as e:
+                last_error = e
+                continue # Try next model
+        
+        return f"AI Error: Could not connect to any model. Last error: {last_error}"
+    except Exception as e: return f"System Error: {e}"
 
 # --- UI START ---
 c_title, c_reset = st.columns([4, 1])
@@ -521,7 +524,7 @@ with tabs[3]:
                     st.write(ans)
                     st.session_state.messages.append({"role": "assistant", "content": ans})
 
-# --- FOOTER ---
+# --- RESTORED FOOTER ---
 st.divider()
 with st.expander("ℹ️ How to Read Results & Disclaimer"):
     st.markdown("""
