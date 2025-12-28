@@ -12,10 +12,9 @@ import google.generativeai as genai
 # --- PAGE CONFIG (Mobile Friendly) ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
 
-# --- CSS FOR MOBILE CARDS (FIXED VISIBILITY) ---
+# --- CSS FOR MOBILE CARDS ---
 st.markdown("""
 <style>
-    /* Force text color to black because background is hardcoded light gray */
     .guna-card {
         background-color: #f0f2f6;
         color: #31333F; 
@@ -29,19 +28,11 @@ st.markdown("""
         font-weight: bold;
         display: flex;
         justify-content: space-between;
-        color: #31333F; /* Ensure header title is visible in dark mode */
+        color: #31333F;
     }
-    .guna-score {
-        font-weight: bold;
-    }
-    .guna-reason {
-        font-size: 14px;
-        color: #555; /* Dark grey for subtitle */
-        margin-top: 5px;
-        font-style: italic;
-    }
+    .guna-score { font-weight: bold; }
+    .guna-reason { font-size: 14px; color: #555; margin-top: 5px; font-style: italic; }
     
-    /* Dynamic Colors for Borders & Scores */
     .border-red { border-left-color: #ff4b4b !important; }
     .border-orange { border-left-color: #ffa500 !important; }
     .border-green { border-left-color: #00cc00 !important; }
@@ -49,26 +40,15 @@ st.markdown("""
     .text-red { color: #ff4b4b !important; }
     .text-orange { color: #ffa500 !important; }
     .text-green { color: #00cc00 !important; }
-    
-    .highlight-box {
-        background-color: #fff9c4;
-        color: #31333F; /* Ensure text visibility */
-        padding: 15px;
-        border-radius: 10px;
-        text-align: center;
-        margin-bottom: 10px;
-        border: 1px solid #fbc02d;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # --- SESSION STATE ---
 if "calculated" not in st.session_state: st.session_state.calculated = False
 if "results" not in st.session_state: st.session_state.results = {}
-if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
 
-# --- DATA & CONSTANTS ---
+# --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
@@ -85,7 +65,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v29_final_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v31_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -106,7 +86,7 @@ def get_planetary_positions(date_obj, time_obj, city, country):
     dt = datetime.datetime.combine(date_obj, time_obj)
     offset, msg = get_offset_smart(city, country, dt, 5.5)
     obs = ephem.Observer(); obs.date = dt - datetime.timedelta(hours=offset)
-    obs.lat, obs.lon = '28.6139', '77.2090' # Default Delhi
+    obs.lat, obs.lon = '28.6139', '77.2090' 
     if city: 
         loc = get_cached_coords(city, country)
         if loc: obs.lat, obs.lon = str(loc.latitude), str(loc.longitude)
@@ -119,7 +99,6 @@ def get_planetary_positions(date_obj, time_obj, city, country):
     s_moon = (math.degrees(ephem.Ecliptic(moon).lon) - ayanamsa) % 360
     s_mars = (math.degrees(ephem.Ecliptic(mars).lon) - ayanamsa) % 360
     s_sun = (math.degrees(ephem.Ecliptic(sun).lon) - ayanamsa) % 360
-    
     return s_moon, s_mars, s_sun, msg
 
 def get_nak_rashi(long): return int(long / 13.333333), int(long / 30)
@@ -152,7 +131,7 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- TRANSPARENCY CALCULATION LOGIC ---
+# --- CORE CALCULATION ENGINE ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
@@ -160,11 +139,9 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     # 1. Varna
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
-    v_final = v_raw
-    reason = "Natural Match" if v_raw == 1 else "Mismatch"
+    v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
     if v_raw == 0 and friends: 
-        v_final = 1; reason = "Boosted by Maitri"
-        logs.append(f"**Varna:** Score 0 ➝ 1 because of strong **Maitri**.")
+        v_final = 1; reason = "Boosted by Maitri"; logs.append("Varna: Boosted by Maitri")
     score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
     # 2. Vashya
@@ -172,33 +149,24 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va_raw = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va_raw = 0.5 
-    va_final = va_raw
-    reason = "Magnetic" if va_raw >= 1 else "Mismatch"
-    
+    va_final = va_raw; reason = "Magnetic" if va_raw >= 1 else "Mismatch"
     if va_raw < 2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): 
-        va_final = 2; reason = "Boosted by Maitri/Yoni"
-        why = "Friendship" if friends else "Yoni Match"
-        logs.append(f"**Vashya:** Score {va_raw} ➝ 2 due to **{why}**.")
+        va_final = 2; reason = "Boosted by Maitri/Yoni"; logs.append("Vashya: Boosted by Maitri/Yoni")
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
     # 3. Tara
     cnt = (b_nak - g_nak)%27 + 1
     t_raw = 3 if cnt%9 not in [3,5,7] else 0
-    t_final = t_raw
-    reason = "Benefic" if t_raw == 3 else "Malefic"
+    t_final = t_raw; reason = "Benefic" if t_raw == 3 else "Malefic"
     if t_raw == 0 and friends: 
-        t_final = 3; reason = "Boosted by Maitri"
-        logs.append(f"**Tara:** Score 0 ➝ 3 due to **Maitri**.")
+        t_final = 3; reason = "Boosted by Maitri"; logs.append("Tara: Boosted by Maitri")
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
     # 4. Yoni
     y_raw = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
-    y_final = y_raw
-    reason = "Perfect" if y_raw == 4 else "Mismatch"
+    y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
     if y_raw < 4 and (friends or va_final>=1): 
-        y_final = 4; reason = "Compensated by Maitri/Vashya"
-        why = "Maitri" if friends else "Vashya"
-        logs.append(f"**Yoni:** Score {y_raw} ➝ 4. Mismatch ignored due to strong **{why}**.")
+        y_final = 4; reason = "Compensated by Maitri/Vashya"; logs.append("Yoni: Compensated by Maitri/Vashya")
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
     # 5. Maitri
@@ -208,36 +176,26 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     # 6. Gana
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga_raw = 6 if gb==gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else 1)
-    ga_final = ga_raw
-    reason = "Match" if ga_raw >= 5 else "Mismatch"
+    ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
     if ga_raw < 6 and friends: 
-        ga_final = 6; reason = "Boosted by Maitri"
-        logs.append("Gana: Score boosted by Friendship")
+        ga_final = 6; reason = "Boosted by Maitri"; logs.append("Gana: Boosted by Maitri")
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
     # 7. Bhakoot
     dist = (b_rashi-g_rashi)%12
     bh_raw = 7 if dist not in [1,11,4,8,5,7] else 0
-    bh_final = bh_raw
-    reason = "Love Flow" if bh_raw == 7 else "Blocked"
+    bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
     if bh_raw == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): 
-        bh_final = 7; reason = "Compensated by Maitri/Nadi"
-        logs.append("Bhakoot: Dosha cancelled by Friendship/Nadi")
+        bh_final = 7; reason = "Compensated by Maitri/Nadi"; logs.append("Bhakoot: Compensated")
     score += bh_final; bd.append(("Bhakoot", bh_raw, bh_final, 7, reason))
     
     # 8. Nadi
-    n_raw = 8
-    n_final = 8
-    n_reason = "Healthy"
+    n_raw = 8; n_final = 8; n_reason = "Healthy"
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
         n_raw = 0; n_final = 0; n_reason = "Same Nadi (Dosha)"
-        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: 
-            n_final=8; n_reason="Exception: Allowed Star"; logs.append(f"**Nadi:** Exception for star {NAKSHATRAS[b_nak]}")
-        elif b_rashi==g_rashi and b_nak!=g_nak: 
-            n_final=8; n_reason="Exception: Same Rashi"; logs.append(f"**Nadi:** Exception (Same Rashi, Different Star)")
-        elif friends: 
-            n_final=8; n_reason="Cancelled: Strong Maitri"; logs.append(f"**Nadi:** Dosha Cancelled by strong Maitri.")
-    
+        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: n_final=8; n_reason="Exception: Allowed Star"; logs.append("Nadi: Star Allowed")
+        elif b_rashi==g_rashi and b_nak!=g_nak: n_final=8; n_reason="Exception: Same Rashi"; logs.append("Nadi: Same Rashi")
+        elif friends: n_final=8; n_reason="Cancelled: Strong Maitri"; logs.append("Nadi: Cancelled by Maitri")
     score += n_final; bd.append(("Nadi", n_raw, n_final, 8, n_reason))
 
     # South Indian
@@ -251,15 +209,25 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
 
     return score, bd, logs, rajju_status, vedha_status
 
-def get_daily_panchang():
-    now = datetime.datetime.now()
-    s_moon, _, s_sun, _ = get_planetary_positions(now.date(), now.time(), "Delhi", "India")
-    diff = (s_moon - s_sun) % 360
-    tithi_num = int(diff / 12) + 1
-    paksha = "Shukla" if tithi_num <= 15 else "Krishna"
-    tithi_name = f"Tithi {tithi_num} ({paksha})"
-    nak_idx = int(s_moon / 13.333333)
-    return tithi_name, NAKSHATRAS[nak_idx]
+# --- DISCOVERY LOGIC (TAB 2) ---
+def find_best_matches(source_gender, s_nak, s_rashi):
+    matches = []
+    for i in range(27):
+        target_star_name = NAKSHATRAS[i]
+        valid_rashi_indices = NAK_TO_RASHI_MAP[i]
+        for r_idx in valid_rashi_indices:
+            target_rashi_name = RASHIS[r_idx]
+            if source_gender == "Boy":
+                score, _, _, _, _ = calculate_all(s_nak, s_rashi, i, r_idx)
+            else:
+                score, _, _, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
+            
+            matches.append({
+                "Star": target_star_name,
+                "Rashi": target_rashi_name,
+                "Score": score
+            })
+    return sorted(matches, key=lambda x: x['Score'], reverse=True)
 
 # --- UI START ---
 c_title, c_reset = st.columns([4, 1])
@@ -271,8 +239,8 @@ with c_reset:
         st.session_state.calculated = False
         st.rerun()
 
-# --- 4 DISTINCT TABS ---
-tabs = st.tabs(["❤️ Match", "🌅 Daily Guide", "💍 Wedding Dates", "🤖 Guru AI"])
+# --- 4 DISTINCT TABS (REMOVED DAILY GUIDE) ---
+tabs = st.tabs(["❤️ Match", "🔍 Find Matches", "💍 Wedding Dates", "🤖 Guru AI"])
 
 # --- TAB 1: MATCH ---
 with tabs[0]:
@@ -326,52 +294,33 @@ with tabs[0]:
                 st.session_state.calculated = True
         except Exception as e: st.error(f"Error: {e}")
 
-    # --- RESULTS UI ---
     if st.session_state.calculated:
         res = st.session_state.results
         st.markdown("---")
-        
-        # DETERMINE COLOR
         score_val = res['score']
-        score_color = "#ff4b4b" # Red
-        if score_val >= 18: score_color = "#ffa500" # Orange
-        if score_val >= 25: score_color = "#00cc00" # Green
+        score_color = "#ff4b4b" 
+        if score_val >= 18: score_color = "#ffa500"
+        if score_val >= 25: score_color = "#00cc00"
 
-        # HEADLINE
         col_score, col_gauge = st.columns([1,1])
         with col_score:
             st.markdown(f"<h1 style='text-align: center; color: {score_color}; margin:0;'>{res['score']}</h1>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;'>out of 36</p>", unsafe_allow_html=True)
             status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
             st.markdown(f"<h3 style='text-align: center; color: {score_color};'>{status}</h3>", unsafe_allow_html=True)
-        
         with col_gauge:
-            fig = go.Figure(go.Indicator(
-                mode = "gauge", value = res['score'],
-                gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
+            fig = go.Figure(go.Indicator(mode = "gauge", value = res['score'], gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
-        st.caption("👆 Copy to share on WhatsApp")
         
-        # MOBILE CARDS
         st.markdown("### 📋 Quick Scan")
         for item in res['bd']:
             attr, raw, final, max_pts, reason = item
-            
-            # Logic for Card Styling
-            if final == max_pts:
-                border_class = "border-green"
-                text_class = "text-green"
-            elif final > 0:
-                border_class = "border-orange"
-                text_class = "text-orange"
-            else:
-                border_class = "border-red"
-                text_class = "text-red"
-
+            border_class = "border-green" if final == max_pts else ("border-orange" if final > 0 else "border-red")
+            text_class = "text-green" if final == max_pts else ("text-orange" if final > 0 else "text-red")
             st.markdown(f"""
             <div class="guna-card {border_class}">
                 <div class="guna-header">
@@ -382,7 +331,6 @@ with tabs[0]:
             </div>
             """, unsafe_allow_html=True)
             
-        # RESTORED TRANSPARENCY TABLE
         with st.expander("📊 Detailed Transparency Table (Raw vs Final)"):
             df = pd.DataFrame(res['bd'], columns=["Attribute", "Raw Score", "Final Score", "Max", "Logic"])
             totals = pd.DataFrame([["TOTAL", df["Raw Score"].sum(), df["Final Score"].sum(), 36, "-"]], columns=df.columns)
@@ -398,26 +346,35 @@ with tabs[0]:
             st.write(f"**Boy Mars:** {res['b_mars'][1]}")
             st.write(f"**Girl Mars:** {res['g_mars'][1]}")
 
-# --- TAB 2: DAILY GUIDE ---
+# --- TAB 2: FIND MATCHES ---
 with tabs[1]:
-    st.header("🌅 Daily Guide")
-    tithi, nak = get_daily_panchang()
-    st.markdown(f"""
-    <div class="highlight-box">
-        <h3>Today's Nakshatra</h3>
-        <h1 style="color: #ff9800;">{nak}</h1>
-        <hr>
-        <h3>Tithi</h3>
-        <h4>{tithi}</h4>
-    </div>
-    """, unsafe_allow_html=True)
+    st.header("🔍 Match Finder")
+    st.caption("Find the best compatible stars for you.")
     
-    st.info("💡 **Tip:** Avoid starting new ventures during Rahu Kalam (check local time).")
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        finder_gender = st.selectbox("I am a", ["Boy", "Girl"])
+        finder_star = st.selectbox("My Star", NAKSHATRAS)
+    with col_f2:
+        finder_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(finder_star)]]
+        finder_rashi = st.selectbox("My Rashi", finder_rashi_opts)
+    
+    if st.button("Find Best Matches", type="primary"):
+        with st.spinner("Scanning all 27 stars..."):
+            s_nak = NAKSHATRAS.index(finder_star)
+            s_rashi = RASHIS.index(finder_rashi)
+            matches = find_best_matches(finder_gender, s_nak, s_rashi)
+            
+            st.success(f"Found {len(matches)} combinations!")
+            st.markdown("### Top Matches")
+            
+            df_matches = pd.DataFrame(matches)
+            df_matches['Rating'] = df_matches['Score'].apply(lambda x: "⭐⭐⭐" if x > 25 else ("⭐⭐" if x > 18 else "⭐"))
+            st.dataframe(df_matches, use_container_width=True, hide_index=True)
 
 # --- TAB 3: WEDDING DATES ---
 with tabs[2]:
     st.header("💍 Wedding Dates")
-    st.caption("Find auspicious timelines for the couple.")
     t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
     if st.button("Check Auspicious Dates"):
         r_idx = RASHIS.index(t_rashi)
