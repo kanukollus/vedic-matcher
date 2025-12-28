@@ -24,6 +24,9 @@ st.markdown("""
     .border-green { border-left-color: #00cc00 !important; }
     .border-orange { border-left-color: #ffa500 !important; }
     .border-red { border-left-color: #ff4b4b !important; }
+    .text-green { color: #00cc00 !important; }
+    .text-orange { color: #ffa500 !important; }
+    .text-red { color: #ff4b4b !important; }
     
     .chart-container {
         display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px);
@@ -56,26 +59,25 @@ NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
 RASHIS = ["Aries", "Taurus", "Gemini", "Cancer","Leo", "Virgo", "Libra", "Scorpio","Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 SOUTH_CHART_MAP = {11: 0, 0: 1, 1: 2, 2: 3, 10: 4, 3: 7, 9: 8, 4: 11, 8: 12, 7: 13, 6: 14, 5: 15}
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
-SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
-VARNA_GROUP = [0, 1, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0]
-VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
-YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
-YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
-RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
 MAITRI_TABLE = [[5, 5, 5, 4, 5, 0, 0], [5, 5, 4, 1, 4, 1, 1], [5, 4, 5, 0.5, 5, 3, 0.5],[4, 1, 0.5, 5, 0.5, 5, 4], [5, 4, 5, 0.5, 5, 0.5, 3], [0, 1, 3, 5, 0.5, 5, 5], [0, 1, 0.5, 4, 3, 5, 5]]
 GANA_TYPE = [0, 1, 2, 1, 0, 1, 0, 0, 2, 2, 1, 1, 0, 2, 0, 2, 0, 2, 2, 1, 1, 0, 2, 2, 1, 1, 0]
 GANA_NAMES = ["Deva (Divine)", "Manushya (Human)", "Rakshasa (Demon)"]
 NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2]
 NADI_NAMES = ["Adi (Start)", "Madhya (Middle)", "Antya (End)"]
 SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shravana", "Uttara Bhadrapada", "Revati"]
-NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
+VARNA_GROUP = [0, 1, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0]
+VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
+YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
+YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
+RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
+NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v49_quota_saver", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v50_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -222,21 +224,24 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     verdict = ""
-    if score >= 25: verdict += "Mathematically, this is an **Excellent Match** (>25 points). "
-    elif score >= 18: verdict += "Mathematically, this is a **Good Match** (18-24 points). "
-    else: verdict += "Mathematically, the compatibility score is **Below Average**. "
+    if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
+    elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
+    else: verdict += "Mathematically, the compatibility score is on the lower side."
     
-    if rajju == "Fail": verdict += " However, the **Rajju Dosha** (Health mismatch) is a concern that requires remedy."
+    if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
+    elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
     
-    verdict += f"\n\n**⏱️ Timing:** Boy is running *{b_dasha}*, Girl is running *{g_dasha}*. "
-    if b_dasha == g_dasha: verdict += "Running the same Dasha creates a 'resonance effect'—intense highs and lows."
-    else: verdict += "Different periods help balance each other out."
+    verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
+    if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
+        verdict += "Since both are running similar intense periods, mutual patience is key."
+    else: verdict += "These periods complement each other well for growth."
         
-    verdict += "\n\n**🪐 Planetary Context:** "
-    all_obs = b_obs + g_obs
-    if not all_obs: verdict += "Planetary positions are largely neutral, meaning free will plays the biggest role."
-    elif any("⚠️" in o for o in all_obs): verdict += "There are planetary challenges (see below) requiring patience and maturity."
-    else: verdict += "Planetary influences are supportive and protective."
+    verdict += "\n\n**Planetary Influence:** "
+    if any("Aspect" in o for o in b_obs + g_obs):
+        verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
+    elif any("Occupants" in o for o in b_obs + g_obs):
+        verdict += "Planets occupying the 7th house add specific flavors (energy or wisdom) to the bond."
+    else: verdict += "The planetary positions are largely neutral, leaving the relationship's success in your own hands."
     return verdict
 
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
@@ -338,13 +343,12 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
-# --- OPTIMIZED AI HANDLER (QUOTA SAVER) ---
+# --- ROBUST AI HANDLER (SAFE MODELS) ---
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
-        # Optimized: No list_models call to save quota
-        # Hardcoded list of standard free-tier models
-        candidates = ["gemini-1.5-flash", "gemini-1.5-pro"]
+        # Safe list of models - no "list_models" call to save quota
+        candidates = ["gemini-1.5-flash", "gemini-1.0-pro", "gemini-pro"]
         
         last_err = None
         for m in candidates:
@@ -353,8 +357,8 @@ def handle_ai_query(prompt, context_str, key):
                 chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
                 return chat.send_message(prompt).text
             except Exception as e:
-                # If quota error, stop immediately. Don't retry other models.
-                if "429" in str(e): return "⚠️ **Quota Exceeded:** The free AI limit has been reached. Please wait 1 minute and try again."
+                # Quota check
+                if "429" in str(e): return "⚠️ **Quota Exceeded:** Free AI limit reached. Please wait 60s."
                 last_err = e
                 continue
         return f"AI Error: {last_err}"
@@ -430,7 +434,7 @@ with tabs[0]:
                     b_obs = analyze_aspects_and_occupation_rich(b_planets, b_rashi)
                     g_obs = analyze_aspects_and_occupation_rich(g_planets, g_rashi)
                 
-                human_verdict = generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha_name, g_dasha_name)
+                human_verdict = generate_human_verdict(score, rajju, b_obs, g_obs, f"{b_dasha_name} ({b_dasha_tone})", f"{g_dasha_name} ({g_dasha_tone})")
 
                 st.session_state.results = {
                     "score": score, "bd": breakdown, "logs": logs, 
@@ -440,7 +444,7 @@ with tabs[0]:
                     "rajju": rajju, "vedha": vedha,
                     "b_planets": b_planets, "g_planets": g_planets,
                     "verdict": human_verdict, "b_obs": b_obs, "g_obs": g_obs,
-                    "b_dasha": f"{b_dasha_name} ({b_dasha_tone})", "g_dasha": f"{g_dasha_name} ({g_dasha_tone})"
+                    "b_dasha": f"{b_dasha_name}", "g_dasha": f"{g_dasha_name}"
                 }
                 st.session_state.calculated = True
         except Exception as e: st.error(f"Error: {e}")
@@ -502,7 +506,7 @@ with tabs[0]:
             with c_h1: st.markdown(render_south_indian_chart(res['b_planets'], "Boy's Rashi Chart"), unsafe_allow_html=True)
             with c_h2: st.markdown(render_south_indian_chart(res['g_planets'], "Girl's Rashi Chart"), unsafe_allow_html=True)
         elif input_method == "Birth Details" and not res.get('b_planets'):
-            st.info("💡 Tip: Enable 'Generate Full Horoscopes' to see visual charts & Dasha.")
+            st.info("💡 Tip: Enable 'Generate Full Horoscopes' to see visual charts.")
 
         st.markdown("### 📋 Quick Scan")
         for item in res['bd']:
@@ -526,7 +530,7 @@ with tabs[0]:
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
             st.write(f"**Boy Mars:** {bm}"); st.write(f"**Girl Mars:** {gm}")
 
-# --- OTHER TABS ---
+# --- OTHER TABS (Same as before) ---
 with tabs[1]:
     st.header("🔍 Match Finder"); st.caption("Find the best compatible stars for you.")
     col_f1, col_f2 = st.columns(2)
