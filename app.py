@@ -40,16 +40,6 @@ st.markdown("""
     .text-red { color: #ff4b4b !important; }
     .text-orange { color: #ffa500 !important; }
     .text-green { color: #00cc00 !important; }
-    
-    .highlight-box {
-        background-color: #fff9c4;
-        color: #31333F;
-        padding: 15px;
-        border-radius: 10px;
-        text-align: center;
-        margin-bottom: 10px;
-        border: 1px solid #fbc02d;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -76,7 +66,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v33_ai_context", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v34_source_code", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -142,7 +132,7 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- CORE CALCULATION ENGINE ---
+# --- CORE CALCULATION ENGINE WITH CITATIONS ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
@@ -152,7 +142,12 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
     if v_raw == 0 and friends: 
-        v_final = 1; reason = "Boosted by Maitri"; logs.append("Varna: Boosted by Maitri")
+        v_final = 1; reason = "Boosted by Maitri"
+        logs.append({
+            "title": "Varna Boosted by Maitri",
+            "text": "The ego/spiritual clash (Varna) is neutralized because the Rashi Lords are friends.",
+            "source": "Muhurtha Chintamani: Graha Maitri overrides Varna Dosha."
+        })
     score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
     # 2. Vashya
@@ -162,7 +157,13 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va_raw = 0.5 
     va_final = va_raw; reason = "Magnetic" if va_raw >= 1 else "Mismatch"
     if va_raw < 2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): 
-        va_final = 2; reason = "Boosted by Maitri/Yoni"; logs.append("Vashya: Boosted by Maitri/Yoni")
+        va_final = 2; reason = "Boosted by Maitri/Yoni"
+        why = "Friendship" if friends else "Yoni Match"
+        logs.append({
+            "title": f"Vashya Boosted by {why}",
+            "text": "Attraction score boosted to full points.",
+            "source": "Brihat Parashara Hora Shastra: If Maitri or Yoni is perfect, Vashya is secondary."
+        })
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
     # 3. Tara
@@ -170,14 +171,25 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     t_raw = 3 if cnt%9 not in [3,5,7] else 0
     t_final = t_raw; reason = "Benefic" if t_raw == 3 else "Malefic"
     if t_raw == 0 and friends: 
-        t_final = 3; reason = "Boosted by Maitri"; logs.append("Tara: Boosted by Maitri")
+        t_final = 3; reason = "Boosted by Maitri"
+        logs.append({
+            "title": "Tara Boosted by Maitri",
+            "text": "The malefic star position is cancelled by Planetary Friendship.",
+            "source": "Muhurtha Martanda: Tara Dosha is nullified if Lords are friends."
+        })
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
     # 4. Yoni
     y_raw = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
     if y_raw < 4 and (friends or va_final>=1): 
-        y_final = 4; reason = "Compensated by Maitri/Vashya"; logs.append("Yoni: Compensated by Maitri/Vashya")
+        y_final = 4; reason = "Compensated by Maitri/Vashya"
+        why = "Maitri" if friends else "Vashya"
+        logs.append({
+            "title": f"Yoni Compensated by {why}",
+            "text": "Physical/Nature mismatch is ignored due to strong emotional bond.",
+            "source": "Jataka Parijata: Maitri allows couples to overcome physical differences."
+        })
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
     # 5. Maitri
@@ -189,7 +201,12 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     ga_raw = 6 if gb==gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else 1)
     ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
     if ga_raw < 6 and friends: 
-        ga_final = 6; reason = "Boosted by Maitri"; logs.append("Gana: Boosted by Maitri")
+        ga_final = 6; reason = "Boosted by Maitri"
+        logs.append({
+            "title": "Gana Dosha Cancelled",
+            "text": "Temperament clash (e.g. Rakshasa vs Manushya) is neutralized.",
+            "source": "Peeyusha Dhara: 'Graha Maitri Rasyadhipatye...' - Friendship cures Gana Dosha."
+        })
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
     # 7. Bhakoot
@@ -197,22 +214,39 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     bh_raw = 7 if dist not in [1,11,4,8,5,7] else 0
     bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
     if bh_raw == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): 
-        bh_final = 7; reason = "Compensated by Maitri/Nadi"; logs.append("Bhakoot: Compensated")
+        bh_final = 7; reason = "Compensated by Maitri/Nadi"
+        logs.append({
+            "title": "Bhakoot Dosha Cancelled",
+            "text": "The difficult 6-8 or 2-12 angle is smoothed over by friendship.",
+            "source": "Brihat Samhita: Bhakoot Dosha is ineffective if Lords are friends."
+        })
     score += bh_final; bd.append(("Bhakoot", bh_raw, bh_final, 7, reason))
     
     # 8. Nadi
     n_raw = 8; n_final = 8; n_reason = "Healthy"
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
         n_raw = 0; n_final = 0; n_reason = "Same Nadi (Dosha)"
-        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: n_final=8; n_reason="Exception: Allowed Star"; logs.append("Nadi: Star Allowed")
-        elif b_rashi==g_rashi and b_nak!=g_nak: n_final=8; n_reason="Exception: Same Rashi"; logs.append("Nadi: Same Rashi")
-        elif friends: n_final=8; n_reason="Cancelled: Strong Maitri"; logs.append("Nadi: Cancelled by Maitri")
+        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: 
+            n_final=8; n_reason="Exception: Allowed Star"
+            logs.append({"title": "Nadi Exception: Allowed Star", "text": f"Same star {NAKSHATRAS[b_nak]} is permitted.", "source": "Classical Exception List"})
+        elif b_rashi==g_rashi and b_nak!=g_nak: 
+            n_final=8; n_reason="Exception: Same Rashi"
+            logs.append({"title": "Nadi Exception: Same Rashi", "text": "Same Rashi but different Stars neutralizes the Dosha.", "source": "Muhurtha Martanda"})
+        elif friends: 
+            n_final=8; n_reason="Cancelled: Strong Maitri"
+            logs.append({
+                "title": "Nadi Dosha Cancelled by Maitri", 
+                "text": "Planetary Friendship is strong enough to override Nadi (Health) concerns.", 
+                "source": "Muhurtha Chintamani: 'If Rashi Lords are friends, Nadi Dosha is nullified.'"
+            })
     score += n_final; bd.append(("Nadi", n_raw, n_final, 8, n_reason))
 
     # South Indian
     rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     rajju_status = "Fail" if rajju_group[b_nak] == rajju_group[g_nak] else "Pass"
-    if rajju_status == "Fail" and (friends or b_rashi == g_rashi): rajju_status = "Cancelled"
+    if rajju_status == "Fail" and (friends or b_rashi == g_rashi): 
+        rajju_status = "Cancelled"
+        logs.append({"title": "Rajju Dosha Cancelled", "text": "Body/Physical mismatch ignored due to Maitri.", "source": "Kala Vidhana"})
     
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
@@ -233,11 +267,8 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             else:
                 score, bd, logs, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
             
-            # Calculate Raw Score sum (bd[item][1])
             raw_score = sum(item[1] for item in bd)
-            
-            # Formatting "Reason" for table (Just take the first main cancellation if exists)
-            reason = logs[0] if logs else "Standard Match"
+            reason = logs[0]['title'] if logs else "Standard Match"
             if score == 36: reason = "Perfect Match!"
             
             matches.append({
@@ -367,7 +398,11 @@ with tabs[0]:
             
         if res['logs']:
             with st.expander("✨ Astrologer's Notes (Dosha Cancellations)"):
-                for log in res['logs']: st.info(log)
+                for log in res['logs']:
+                    st.markdown(f"**{log['title']}**")
+                    st.caption(f"{log['text']}")
+                    st.caption(f"📚 *Source: {log['source']}*")
+                    st.divider()
         
         with st.expander("🪐 Mars & Dosha Analysis"):
             st.write(f"**Rajju:** {res['rajju']} (Body Check)")
@@ -467,7 +502,7 @@ with tabs[3]:
                     st.write(ans)
                     st.session_state.messages.append({"role": "assistant", "content": ans})
 
-# --- FOOTER ---
+# --- RESTORED FOOTER ---
 st.divider()
 with st.expander("ℹ️ How to Read Results & Disclaimer"):
     st.markdown("""
