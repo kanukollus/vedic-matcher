@@ -39,6 +39,7 @@ if "calculated" not in st.session_state: st.session_state.calculated = False
 if "results" not in st.session_state: st.session_state.results = {}
 if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
+if "working_model" not in st.session_state: st.session_state.working_model = None
 
 # --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
@@ -59,11 +60,10 @@ RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4]
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
-NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v56_flash_only", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v57_model_hunter", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -361,25 +361,48 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
-# --- STRICT MODEL SELECTION AI HANDLER ---
+# --- MODEL DISCOVERY & SELECTION ---
+# NEW STRATEGY: Try a list of known candidates. If one works, cache it.
+# If none work, show a helpful message.
+@st.cache_resource
+def get_working_model(api_key):
+    genai.configure(api_key=api_key)
+    # List of candidates to try in order of preference
+    candidates = [
+        "gemini-1.5-flash", 
+        "gemini-1.5-pro", 
+        "gemini-1.0-pro",
+        "gemini-pro"
+    ]
+    
+    for model_name in candidates:
+        try:
+            # Test the model with a tiny prompt
+            model = genai.GenerativeModel(model_name)
+            # We don't need a full chat, just a ping to see if it exists/is allowed
+            # Note: generate_content counts as a request, so we do this once per session
+            model.generate_content("Hi")
+            return model_name
+        except Exception:
+            continue # Try the next one
+            
+    return None # None worked
+
 def handle_ai_query(prompt, context_str, key):
     try:
-        genai.configure(api_key=key)
-        # ONLY use Flash. No fallback to Pro to avoid 404s.
-        candidates = ["gemini-1.5-flash"]
+        # Get the cached working model name
+        model_name = get_working_model(key)
         
-        last_err = None
-        for m in candidates:
-            try:
-                model = genai.GenerativeModel(m)
-                chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
-                return chat.send_message(prompt).text
-            except Exception as e:
-                if "429" in str(e): return "⚠️ **Quota Exceeded:** Free AI limit reached. Please wait 60s."
-                last_err = str(e)
-                continue
-        return f"AI Error: {last_err}"
-    except Exception as e: return f"Error: {e}"
+        if not model_name:
+            return "⚠️ **Access Error:** Your API Key works, but it doesn't seem to have access to any standard text models (Flash/Pro). Check your Google Cloud console permissions."
+
+        model = genai.GenerativeModel(model_name)
+        chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
+        return chat.send_message(prompt).text
+        
+    except Exception as e:
+        if "429" in str(e): return "⚠️ **Quota Exceeded:** You are clicking too fast! Please wait 60 seconds."
+        return f"AI Error: {e}"
 
 # --- UI START ---
 c_title, c_reset = st.columns([4, 1])
