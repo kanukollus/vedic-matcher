@@ -77,7 +77,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v50_final", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v52_smart_cache", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -250,7 +250,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     score = 0; bd = []; logs = []
     
     v = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
-    if v == 0 and friends: v=1; logs.append({"Attr": "Varna", "Fix": "Maitri"})
+    if v == 0 and friends: v=1; logs.append({"Attribute": "Varna", "The Problem (Raw)": "Ego Conflict (0 pts)", "The Fix (Cancellation)": "Maitri: Rashi Lords are friends.", "Ancient Source": "Muhurtha Chintamani"})
     score += v; bd.append(("Varna", 1 if v else 0, v, 1, ""))
     
     va = 0; 
@@ -258,18 +258,18 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va = 1
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va = 0.5
     va_f = va
-    if va < 2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): va_f=2; logs.append({"Attr": "Vashya", "Fix": "Maitri/Yoni"})
+    if va < 2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): va_f=2; logs.append({"Attribute": "Vashya", "The Problem (Raw)": f"Attraction Mismatch ({va} pts)", "The Fix (Cancellation)": "Maitri/Yoni overrides Vashya.", "Ancient Source": "Brihat Parashara"})
     score += va_f; bd.append(("Vashya", va, va_f, 2, ""))
     
     cnt = (b_nak - g_nak)%27 + 1
     t = 3 if cnt%9 not in [3,5,7] else 0
     t_f = t
-    if t == 0 and friends: t_f=3; logs.append({"Attr": "Tara", "Fix": "Maitri"})
+    if t == 0 and friends: t_f=3; logs.append({"Attribute": "Tara", "The Problem (Raw)": "Malefic Star Position (0 pts)", "The Fix (Cancellation)": "Maitri: Lords are friends.", "Ancient Source": "Muhurtha Martanda"})
     score += t_f; bd.append(("Tara", t, t_f, 3, ""))
     
     y = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_f = y
-    if y < 4 and (friends or va_f>=1): y_f=4; logs.append({"Attr": "Yoni", "Fix": "Maitri/Vashya"})
+    if y < 4 and (friends or va_f>=1): y_f=4; logs.append({"Attribute": "Yoni", "The Problem (Raw)": "Nature Mismatch", "The Fix (Cancellation)": "Maitri boosts intimacy.", "Ancient Source": "Jataka Parijata"})
     score += y_f; bd.append(("Yoni", y, y_f, 4, ""))
     
     score += maitri_raw; bd.append(("Maitri", maitri_raw, maitri_raw, 5, ""))
@@ -277,21 +277,22 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga = 6 if gb==gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else 1)
     ga_f = ga
-    if ga < 6 and friends: ga_f=6; logs.append({"Attr": "Gana", "Fix": "Maitri"})
+    if ga < 6 and friends: ga_f=6; logs.append({"Attribute": "Gana", "The Problem (Raw)": f"{GANA_NAMES[gb]} vs {GANA_NAMES[gg]}", "The Fix (Cancellation)": "Maitri: Lords are friends.", "Ancient Source": "Muhurtha Chintamani"})
     score += ga_f; bd.append(("Gana", ga, ga_f, 6, ""))
     
     d = (b_rashi-g_rashi)%12
     bh = 7 if d not in [1,11,4,8,5,7] else 0
     bh_f = bh
-    if bh == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): bh_f=7; logs.append({"Attr": "Bhakoot", "Fix": "Maitri"})
+    if bh == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): bh_f=7; logs.append({"Attribute": "Bhakoot", "The Problem (Raw)": f"Bad Position", "The Fix (Cancellation)": "Maitri overrides position.", "Ancient Source": "Brihat Samhita"})
     score += bh_f; bd.append(("Bhakoot", bh, bh_f, 7, ""))
     
     n = 8; n_f = 8
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
         n = 0; n_f = 0
-        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: n_f=8; logs.append({"Attr": "Nadi", "Fix": "Allowed Star"})
-        elif b_rashi==g_rashi and b_nak!=g_nak: n_f=8; logs.append({"Attr": "Nadi", "Fix": "Same Rashi"})
-        elif friends: n_f=8; logs.append({"Attr": "Nadi", "Fix": "Maitri"})
+        problem = f"{NADI_NAMES[NADI_TYPE[b_nak]]} vs {NADI_NAMES[NADI_TYPE[g_nak]]}"
+        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: n_f=8; logs.append({"Attribute": "Nadi", "The Problem (Raw)": problem, "The Fix (Cancellation)": f"Star {NAKSHATRAS[b_nak]} is an Exception.", "Ancient Source": "Classical List"})
+        elif b_rashi==g_rashi and b_nak!=g_nak: n_f=8; logs.append({"Attribute": "Nadi", "The Problem (Raw)": problem, "The Fix (Cancellation)": "Same Rashi, Different Star.", "Ancient Source": "Muhurtha Martanda"})
+        elif friends: n_f=8; logs.append({"Attribute": "Nadi", "The Problem (Raw)": problem, "The Fix (Cancellation)": "Maitri overrides Nadi.", "Ancient Source": "Muhurtha Chintamani"})
     score += n_f; bd.append(("Nadi", n, n_f, 8, ""))
     
     rg = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
@@ -338,18 +339,42 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             if source_gender == "Boy": score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, r_idx)
             else: score, bd, logs, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
             raw_score = sum(item[1] for item in bd)
-            reason = logs[0]['Fix'] if logs else "Standard Match"
+            reason = logs[0]['The Fix (Cancellation)'] if logs else "Standard Match"
             if score == 36: reason = "Perfect Match!"
             matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
-# --- ROBUST AI HANDLER (SAFE MODELS) ---
+# --- SMART CACHE FOR AI MODELS ---
+@st.cache_data(ttl=3600)
+def get_available_models(api_key):
+    genai.configure(api_key=api_key)
+    try:
+        # Get list from API
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        return models
+    except:
+        return []
+
 def handle_ai_query(prompt, context_str, key):
     try:
-        genai.configure(api_key=key)
-        # Safe list of models - no "list_models" call to save quota
-        candidates = ["gemini-1.5-flash", "gemini-1.0-pro", "gemini-pro"]
+        # 1. Get Models (Cached)
+        available = get_available_models(key)
         
+        # 2. Prioritize
+        preferred = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro", "gemini-pro"]
+        candidates = []
+        for p in preferred:
+            for a in available:
+                if p in a: candidates.append(a)
+        
+        # Add any others from available as fallback
+        for a in available:
+            if a not in candidates: candidates.append(a)
+            
+        # Hard fallback if API list failed but key might be valid
+        if not candidates: candidates = preferred
+
+        # 3. Try candidates
         last_err = None
         for m in candidates:
             try:
@@ -357,7 +382,6 @@ def handle_ai_query(prompt, context_str, key):
                 chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
                 return chat.send_message(prompt).text
             except Exception as e:
-                # Quota check
                 if "429" in str(e): return "⚠️ **Quota Exceeded:** Free AI limit reached. Please wait 60s."
                 last_err = e
                 continue
@@ -485,7 +509,7 @@ with tabs[0]:
             st.markdown("### 2. ⚙️ Harnessing (Applying Ancient Rules)")
             if res['logs']:
                 st.write(f"I applied **Dosha Bhanga** (cancellation rules) to refine the score:")
-                for l in res['logs']: st.caption(f"- {l['Attr']}: {l['Fix']}")
+                for l in res['logs']: st.caption(f"- {l['Attribute']}: {l['The Fix (Cancellation)']}")
             else: st.write("No special cancellation rules were needed.")
             
             st.markdown("### 3. ⏱️ Timing (Dasha Sandhi)")
@@ -558,7 +582,7 @@ with tabs[3]:
     st.header("🤖 Guru AI"); user_key = st.secrets.get("GEMINI_API_KEY", None)
     if not user_key: user_key = st.text_input("API Key (aistudio.google.com)", type="password")
     
-    # CLEAR BUTTON (Fix for stuck error history)
+    # CLEAR BUTTON
     if st.button("🗑️ Clear Chat History"):
         st.session_state.messages = []
         st.rerun()
