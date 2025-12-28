@@ -281,6 +281,7 @@ def format_chart_for_ai(chart_data):
     return "; ".join(readable)
 
 # --- ROBUST AI HANDLER ---
+# --- ROBUST AI HANDLER WITH QUOTA CHECK ---
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
@@ -299,7 +300,12 @@ def handle_ai_query(prompt, context_str, key):
                 model = genai.GenerativeModel(m)
                 chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
                 return chat.send_message(prompt).text
-            except Exception as e: last_err = e; continue
+            except Exception as e:
+                # Check for Quota Error specifically
+                if "429" in str(e):
+                    return "⚠️ **Quota Exceeded:** The free AI limit has been reached. Please wait 1 minute and try again."
+                last_err = e
+                continue
         return f"AI Error: {last_err}"
     except Exception as e: return f"Error: {e}"
 
