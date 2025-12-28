@@ -16,37 +16,20 @@ st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="
 # --- CSS STYLING ---
 st.markdown("""
 <style>
-    .guna-card {
-        background-color: #f0f2f6; color: #31333F; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #ccc;
-    }
+    .guna-card { background-color: #f0f2f6; color: #31333F; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #ccc; }
     .guna-header { font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; color: #31333F; }
     .guna-score { font-weight: bold; }
     .guna-reason { font-size: 14px; color: #555; margin-top: 5px; font-style: italic; }
-    
     .border-green { border-left-color: #00cc00 !important; }
     .border-orange { border-left-color: #ffa500 !important; }
     .border-red { border-left-color: #ff4b4b !important; }
-    
     .text-green { color: #00cc00 !important; }
     .text-orange { color: #ffa500 !important; }
     .text-red { color: #ff4b4b !important; }
-    
-    .chart-container {
-        display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px);
-        gap: 2px; background-color: #444; border: 2px solid #333; width: 100%; max-width: 350px; margin: auto; font-size: 10px;
-    }
-    .chart-box {
-        background-color: #fffbe6; color: #000; display: flex; align-items: center; justify-content: center;
-        text-align: center; font-weight: bold; padding: 2px; border: 1px solid #ccc;
-    }
-    .chart-center {
-        grid-column: 2 / 4; grid-row: 2 / 4; background-color: #fff;
-        display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: #555;
-    }
-    
-    .verdict-box {
-        background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20;
-    }
+    .chart-container { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px); gap: 2px; background-color: #444; border: 2px solid #333; width: 100%; max-width: 350px; margin: auto; font-size: 10px; }
+    .chart-box { background-color: #fffbe6; color: #000; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #ccc; }
+    .chart-center { grid-column: 2 / 4; grid-row: 2 / 4; background-color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: #555; }
+    .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 </style>
 """, unsafe_allow_html=True)
@@ -76,10 +59,11 @@ RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4]
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
+NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v55_strict_models", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v56_flash_only", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -381,8 +365,8 @@ def find_best_matches(source_gender, s_nak, s_rashi):
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
-        # ONLY ALLOWED MODELS - No Pro 1.0 (Deprecated), No ListModels (Quota Waste)
-        candidates = ["gemini-1.5-flash", "gemini-1.5-pro"]
+        # ONLY use Flash. No fallback to Pro to avoid 404s.
+        candidates = ["gemini-1.5-flash"]
         
         last_err = None
         for m in candidates:
@@ -391,7 +375,6 @@ def handle_ai_query(prompt, context_str, key):
                 chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
                 return chat.send_message(prompt).text
             except Exception as e:
-                # IMPORTANT: If quota exceeded, STOP. Do not try next model (it shares quota).
                 if "429" in str(e): return "⚠️ **Quota Exceeded:** Free AI limit reached. Please wait 60s."
                 last_err = str(e)
                 continue
