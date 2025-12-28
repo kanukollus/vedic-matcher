@@ -70,7 +70,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v40_freemium", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v40_1_full", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -107,7 +107,6 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     
     chart_data = None
     if detailed:
-        # Full Horoscope Calculation (Pro Feature)
         bodies = [ephem.Sun(), ephem.Moon(), ephem.Mars(), ephem.Mercury(), ephem.Jupiter(), ephem.Venus(), ephem.Saturn()]
         names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"]
         chart_data = {}
@@ -320,7 +319,6 @@ with tabs[0]:
             g_date = st.date_input("Date", datetime.date(1994,11,28), key="g_d")
             g_time = st.time_input("Time", datetime.time(7,30), key="g_t")
             g_city = st.text_input("City", "Hyderabad", key="g_c")
-        # PRO TOGGLE
         st.markdown("---")
         pro_mode = st.toggle("✨ Generate Full Horoscopes (Pro Feature)")
     else:
@@ -341,7 +339,6 @@ with tabs[0]:
             with st.spinner("Analyzing..."):
                 b_planets, g_planets = None, None
                 if input_method == "Birth Details":
-                    # Pass 'pro_mode' to helper to decide if full chart is needed
                     b_moon, b_mars, _, _, b_chart = get_planetary_positions(b_date, b_time, b_city, "India", detailed=pro_mode)
                     g_moon, g_mars, _, _, g_chart = get_planetary_positions(g_date, g_time, g_city, "India", detailed=pro_mode)
                     b_nak, b_rashi = get_nak_rashi(b_moon)
@@ -402,7 +399,6 @@ with tabs[0]:
             with st.expander("📜 Ancient Wisdom & Cancellations (Dosha Bhanga)"):
                 st.table(pd.DataFrame(res['logs']))
         
-        # --- PRO: VISUAL HOROSCOPES ---
         if res.get('b_planets') and res.get('g_planets'):
             st.markdown("### 🔮 Pro: Planetary Charts")
             c_h1, c_h2 = st.columns(2)
@@ -413,7 +409,6 @@ with tabs[0]:
 
         with st.expander("🪐 Mars & Dosha Analysis"):
             st.write(f"**Rajju:** {res['rajju']} (Body Check)"); st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
-            # Fix Mars display tuple/string issue
             bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
             st.write(f"**Boy Mars:** {bm}"); st.write(f"**Girl Mars:** {gm}")
@@ -438,7 +433,7 @@ with tabs[1]:
 with tabs[2]:
     st.header("💍 Wedding Dates"); t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
     if st.button("Check Auspicious Dates"):
-        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years"); 
+        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years")
         for y, s in predict_marriage_luck_years(r_idx): st.write(f"**{y}:** {s}")
         st.subheader("Lucky Month"); st.info(f"❤️ **{predict_wedding_month(r_idx)}**")
 
@@ -464,4 +459,21 @@ with tabs[3]:
                     st.write(ans); st.session_state.messages.append({"role": "assistant", "content": ans})
 
 st.divider()
-with st.expander("ℹ️ How to Read Results"): st.markdown("18-24: Good. 25+: Excellent. Rajju/Nadi are critical.")
+with st.expander("ℹ️ How to Read Results & Disclaimer"):
+    st.markdown("""
+    ### **1. The Score (Gunas)**
+    * **18-24:** Good Match.
+    * **25-36:** Excellent Match.
+    * **Below 18:** Not recommended without remedies.
+
+    ### **2. The Critical Checks (Doshas)**
+    * **Rajju (Body):** Must be 'Pass'. Indicates physical safety.
+    * **Vedha (Enemy):** Must be 'Pass'. Indicates conflict.
+    * **Nadi (Genes):** Critical for health/lineage.
+
+    ### **3. Mars (Mangal) Dosha**
+    * Checks if Mars energy is balanced between the couple.
+    * *Note: This app automatically checks for cancellations (e.g., Mars in own house).*
+    """)
+    st.caption("----------------------------------------------------------------")
+    st.caption("⚠️ **Disclaimer:** This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features are powered by Google Gemini. Calculations are based on Lahiri Ayanamsa. This is for informational purposes only; please consult a human astrologer for final marriage decisions.")
