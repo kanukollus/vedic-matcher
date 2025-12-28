@@ -82,7 +82,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v44_transparency_ui", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v44_1_final_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -436,15 +436,12 @@ with tabs[0]:
             fig = go.Figure(go.Indicator(mode = "gauge", value = res['score'], gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
-            
-
-[Image of gauge chart]
- # removed
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
         st.caption("👆 Copy to share on WhatsApp")
         
+        # --- AI ASTROLOGER VERDICT ---
         st.markdown(f"""
         <div class="verdict-box">
             <div class="verdict-title">🤖 AI Astrologer's Verdict</div>
@@ -460,7 +457,7 @@ with tabs[0]:
             st.markdown("### 2. ⚙️ Harnessing (Applying Ancient Rules)")
             if res['logs']:
                 st.write(f"I found {len(res['logs'])} critical Doshas that were **cancelled** or modified by special rules from texts like *Muhurtha Chintamani*:")
-                for l in res['logs']: st.caption(f"- {l['title']}: {l['text']}")
+                for l in res['logs']: st.caption(f"- {l['Attribute']}: {l['The Fix (Cancellation)']}")
             else:
                 st.write("No special cancellation rules were needed. The score is straightforward.")
                 
@@ -525,7 +522,7 @@ with tabs[1]:
 with tabs[2]:
     st.header("💍 Wedding Dates"); t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
     if st.button("Check Auspicious Dates"):
-        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years"); 
+        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years")
         for y, s in predict_marriage_luck_years(r_idx): st.write(f"**{y}:** {s}")
         st.subheader("Lucky Month"); st.info(f"❤️ **{predict_wedding_month(r_idx)}**")
 
