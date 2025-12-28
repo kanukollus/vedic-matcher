@@ -72,13 +72,13 @@ NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1
 NADI_NAMES = ["Adi (Start)", "Madhya (Middle)", "Antya (End)"]
 SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shravana", "Uttara Bhadrapada", "Revati"]
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
-# Dasha Data
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
 
+# --- ALL HELPER FUNCTIONS (DEFINED BEFORE USE) ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v47_unpack_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v47_1_fixed", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -163,7 +163,6 @@ def render_south_indian_chart(positions, title):
         <div class="chart-box" style="grid-column: 4; grid-row: 4;">{grid_items[15]}<br><span style='font-size:8px; color:grey'>Virgo</span></div>
     </div>"""
 
-# --- NEW: DASHA & ASPECT CALCULATOR ---
 def calculate_current_dasha(moon_long, birth_date):
     nak_idx = int(moon_long / 13.333333)
     deg_in_nak = moon_long % 13.333333
@@ -204,8 +203,7 @@ def calculate_current_dasha(moon_long, birth_date):
     return curr_lord, tones.get(curr_lord, "General Growth")
 
 def analyze_aspects_and_occupation(chart_data, moon_rashi):
-    if not chart_data: return [] # FIXED: Returns 1 value now
-    
+    if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
     
@@ -254,66 +252,160 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     else: verdict += "The planetary positions are largely neutral, leaving the relationship's success in your own hands."
     return verdict
 
-# --- CORE CALCULATION ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
     score = 0; bd = []; logs = []
     
-    v = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
-    if v == 0 and friends: v=1; logs.append({"Attr": "Varna", "Fix": "Maitri"})
-    score += v; bd.append(("Varna", 1 if v else 0, v, 1, ""))
+    # 1. Varna
+    v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
+    v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
+    if v_raw == 0 and friends: 
+        v_final = 1; reason = "Boosted by Maitri"
+        logs.append({"Attribute": "Varna", "The Problem (Raw)": "Ego Conflict (0 pts)", "The Fix (Cancellation)": "Maitri: Rashi Lords are friends.", "Ancient Source": "Muhurtha Chintamani"})
+    score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
-    va = 0; 
-    if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va = 2
-    elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va = 1
-    elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va = 0.5
-    va_f = va
-    if va < 2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): va_f=2; logs.append({"Attr": "Vashya", "Fix": "Maitri/Yoni"})
-    score += va_f; bd.append(("Vashya", va, va_f, 2, ""))
+    # 2. Vashya
+    va_raw = 0
+    if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va_raw = 2
+    elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
+    elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va_raw = 0.5 
+    va_final = va_raw; reason = "Magnetic" if va_raw >= 1 else "Mismatch"
+    if va_raw < 2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): 
+        va_final = 2; reason = "Boosted by Maitri/Yoni"
+        logs.append({"Attribute": "Vashya", "The Problem (Raw)": f"Attraction Mismatch ({va_raw} pts)", "The Fix (Cancellation)": "Maitri/Yoni overrides Vashya.", "Ancient Source": "Brihat Parashara"})
+    score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
+    # 3. Tara
     cnt = (b_nak - g_nak)%27 + 1
-    t = 3 if cnt%9 not in [3,5,7] else 0
-    t_f = t
-    if t == 0 and friends: t_f=3; logs.append({"Attr": "Tara", "Fix": "Maitri"})
-    score += t_f; bd.append(("Tara", t, t_f, 3, ""))
+    t_raw = 3 if cnt%9 not in [3,5,7] else 0
+    t_final = t_raw; reason = "Benefic" if t_raw == 3 else "Malefic"
+    if t_raw == 0 and friends: 
+        t_final = 3; reason = "Boosted by Maitri"
+        logs.append({"Attribute": "Tara", "The Problem (Raw)": "Malefic Star Position (0 pts)", "The Fix (Cancellation)": "Maitri: Lords are friends.", "Ancient Source": "Muhurtha Martanda"})
+    score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
-    y = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
-    y_f = y
-    if y < 4 and (friends or va_f>=1): y_f=4; logs.append({"Attr": "Yoni", "Fix": "Maitri/Vashya"})
-    score += y_f; bd.append(("Yoni", y, y_f, 4, ""))
+    # 4. Yoni
+    y_raw = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
+    y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
+    if y_raw < 4 and (friends or va_final>=1): 
+        y_final = 4; reason = "Compensated by Maitri/Vashya"
+        logs.append({"Attribute": "Yoni", "The Problem (Raw)": "Nature Mismatch", "The Fix (Cancellation)": "Maitri boosts intimacy.", "Ancient Source": "Jataka Parijata"})
+    score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
-    score += maitri_raw; bd.append(("Maitri", maitri_raw, maitri_raw, 5, ""))
+    # 5. Maitri
+    m_final = maitri_raw
+    score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, "Friendly" if m_final>=4 else "Enemy"))
     
+    # 6. Gana
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
-    ga = 6 if gb==gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else 1)
-    ga_f = ga
-    if ga < 6 and friends: ga_f=6; logs.append({"Attr": "Gana", "Fix": "Maitri"})
-    score += ga_f; bd.append(("Gana", ga, ga_f, 6, ""))
+    ga_raw = 6 if gb==gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else 1)
+    ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
+    if ga_raw < 6 and friends: 
+        ga_final = 6; reason = "Boosted by Maitri"
+        logs.append({"Attribute": "Gana", "The Problem (Raw)": f"{GANA_NAMES[gb]} vs {GANA_NAMES[gg]}", "The Fix (Cancellation)": "Maitri: Lords are friends.", "Ancient Source": "Muhurtha Chintamani"})
+    score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
-    d = (b_rashi-g_rashi)%12
-    bh = 7 if d not in [1,11,4,8,5,7] else 0
-    bh_f = bh
-    if bh == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): bh_f=7; logs.append({"Attr": "Bhakoot", "Fix": "Maitri"})
-    score += bh_f; bd.append(("Bhakoot", bh, bh_f, 7, ""))
+    # 7. Bhakoot
+    dist = (b_rashi-g_rashi)%12
+    bh_raw = 7 if dist not in [1,11,4,8,5,7] else 0
+    bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
+    if bh_raw == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): 
+        bh_final = 7; reason = "Compensated by Maitri/Nadi"
+        logs.append({"Attribute": "Bhakoot", "The Problem (Raw)": f"Bad Position", "The Fix (Cancellation)": "Maitri overrides position.", "Ancient Source": "Brihat Samhita"})
+    score += bh_final; bd.append(("Bhakoot", bh_raw, bh_final, 7, reason))
     
-    n = 8; n_f = 8
+    # 8. Nadi
+    n_raw = 8; n_final = 8; n_reason = "Healthy"
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
-        n = 0; n_f = 0
-        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: n_f=8; logs.append({"Attr": "Nadi", "Fix": "Allowed Star"})
-        elif b_rashi==g_rashi and b_nak!=g_nak: n_f=8; logs.append({"Attr": "Nadi", "Fix": "Same Rashi"})
-        elif friends: n_f=8; logs.append({"Attr": "Nadi", "Fix": "Maitri"})
-    score += n_f; bd.append(("Nadi", n, n_f, 8, ""))
+        n_raw = 0; n_final = 0; n_reason = "Same Nadi (Dosha)"
+        problem = f"{NADI_NAMES[NADI_TYPE[b_nak]]} vs {NADI_NAMES[NADI_TYPE[g_nak]]}"
+        if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: 
+            n_final=8; n_reason="Exception: Allowed Star"
+            logs.append({"Attribute": "Nadi", "The Problem (Raw)": problem, "The Fix (Cancellation)": f"Star {NAKSHATRAS[b_nak]} is an Exception.", "Ancient Source": "Classical List"})
+        elif b_rashi==g_rashi and b_nak!=g_nak: 
+            n_final=8; n_reason="Exception: Same Rashi"
+            logs.append({"Attribute": "Nadi", "The Problem (Raw)": problem, "The Fix (Cancellation)": "Same Rashi, Different Star.", "Ancient Source": "Muhurtha Martanda"})
+        elif friends: 
+            n_final=8; n_reason="Cancelled: Strong Maitri"
+            logs.append({"Attribute": "Nadi", "The Problem (Raw)": problem, "The Fix (Cancellation)": "Maitri overrides Nadi.", "Ancient Source": "Muhurtha Chintamani"})
+    score += n_final; bd.append(("Nadi", n_raw, n_final, 8, n_reason))
+
+    # South Indian
+    rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
+    rajju_status = "Fail" if rajju_group[b_nak] == rajju_group[g_nak] else "Pass"
+    if rajju_status == "Fail" and (friends or b_rashi == g_rashi): 
+        rajju_status = "Cancelled"
+        logs.append({"Attribute": "Rajju", "The Problem (Raw)": "Body Part Clash", "The Fix (Cancellation)": "Maitri overrides Rajju.", "Ancient Source": "Kala Vidhana"})
     
-    rg = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
-    r_stat = "Fail" if rg[b_nak] == rg[g_nak] else "Pass"
-    if r_stat == "Fail" and (friends or b_rashi == g_rashi): r_stat = "Cancelled"
-    
-    v_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
-    for k, v in list(v_pairs.items()): v_pairs[v] = k
-    v_stat = "Fail" if v_pairs.get(g_nak) == b_nak else "Pass"
-    
-    return score, bd, logs, r_stat, v_stat
+    vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
+    for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
+    vedha_status = "Fail" if vedha_pairs.get(g_nak) == b_nak else "Pass"
+
+    return score, bd, logs, rajju_status, vedha_status
+
+def format_chart_for_ai(chart_data):
+    if not chart_data: return "Chart not generated."
+    readable = []
+    for rashi_idx, planets in chart_data.items():
+        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+    return "; ".join(readable)
+
+def get_jupiter_position_for_year(year):
+    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
+    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
+
+def predict_marriage_luck_years(rashi_idx):
+    predictions = []
+    for year in [2025, 2026, 2027]:
+        jup_rashi = get_jupiter_position_for_year(year)
+        house = (jup_rashi - rashi_idx) % 12 + 1
+        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
+        predictions.append((year, res))
+    return predictions
+
+def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
+
+def find_best_matches(source_gender, s_nak, s_rashi):
+    matches = []
+    for i in range(27):
+        target_star_name = NAKSHATRAS[i]
+        valid_rashi_indices = NAK_TO_RASHI_MAP[i]
+        for r_idx in valid_rashi_indices:
+            target_rashi_name = RASHIS[r_idx]
+            if source_gender == "Boy": score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, r_idx)
+            else: score, bd, logs, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
+            raw_score = sum(item[1] for item in bd)
+            reason = logs[0]['The Fix (Cancellation)'] if logs else "Standard Match"
+            if score == 36: reason = "Perfect Match!"
+            matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
+    return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
+
+def handle_ai_query(prompt, context_str, key):
+    try:
+        genai.configure(api_key=key)
+        try: available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        except: available_models = []
+        preferred = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro", "gemini-pro"]
+        candidates = []
+        for p in preferred:
+            for a in available_models:
+                if p in a: candidates.append(a)
+        if not candidates: candidates = preferred
+        
+        last_err = None
+        for m in candidates:
+            try:
+                model = genai.GenerativeModel(m)
+                chat = model.start_chat(history=[{"role": "user", "parts": [context_str]}, {"role": "model", "parts": ["I am your Vedic Astrologer."]}])
+                return chat.send_message(prompt).text
+            except Exception as e:
+                if "429" in str(e): return "⚠️ **Quota Exceeded:** Please wait 60s."
+                last_err = e; continue
+        return f"AI Error: {last_err}"
+    except Exception as e: return f"Error: {e}"
 
 # --- UI START ---
 c_title, c_reset = st.columns([4, 1])
@@ -324,6 +416,7 @@ with c_reset:
 
 tabs = st.tabs(["❤️ Match", "🔍 Find Matches", "💍 Wedding Dates", "🤖 Guru AI"])
 
+# --- TAB 1: MATCH ---
 with tabs[0]:
     input_method = st.radio("Mode:", ["Birth Details", "Direct Star Entry"], horizontal=True, key="input_mode")
     pro_mode = False
@@ -434,10 +527,11 @@ with tabs[0]:
             
             st.markdown("### 2. ⚙️ Harnessing (Applying Ancient Rules)")
             if res['logs']:
-                st.write(f"I applied **Dosha Bhanga** (cancellation rules) to refine the score:")
-                for l in res['logs']: st.caption(f"- {l['Attr']}: {l['Fix']}")
-            else: st.write("No special cancellation rules were needed.")
-            
+                st.write(f"I found {len(res['logs'])} critical Doshas that were **cancelled** or modified by special rules from texts like *Muhurtha Chintamani*:")
+                for l in res['logs']: st.caption(f"- {l['Attribute']}: {l['The Fix (Cancellation)']}")
+            else:
+                st.write("No special cancellation rules were needed. The score is straightforward.")
+                
             st.markdown("### 3. ⏱️ Timing (Dasha Sandhi)")
             if "Unknown" not in res['b_dasha']:
                 st.write(f"I checked the current Time Cycles (Vimshottari Dasha):")
@@ -446,17 +540,22 @@ with tabs[0]:
             
             st.markdown("### 4. 🧵 Stitching (Planetary Context)")
             if res['b_obs'] or res['g_obs']:
-                st.write("I analyzed the **Chandra Kundali** for 7th House Aspects (Drishti) & Occupation:")
+                st.write("I analyzed the **Chandra Kundali** (Moon Chart) to see the actual planetary influence on the 7th House (Marriage):")
                 if res['b_obs']: st.caption(f"**Boy:** {'; '.join(res['b_obs'])}")
                 if res['g_obs']: st.caption(f"**Girl:** {'; '.join(res['g_obs'])}")
-            else: st.write("Planetary chart analysis skipped or neutral.")
+            else:
+                st.write("Planetary chart analysis was either skipped (Basic Mode) or showed no major planetary interference.")
+                
+            st.markdown("### 4. ✨ Concluding")
+            st.write("Synthesizing the score, dosha checks, and planetary alignment, I generated the final verdict above.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            st.markdown("### 🔮 Pro: Planetary Charts"); c_h1, c_h2 = st.columns(2)
+            st.markdown("### 🔮 Pro: Planetary Charts")
+            c_h1, c_h2 = st.columns(2)
             with c_h1: st.markdown(render_south_indian_chart(res['b_planets'], "Boy's Rashi Chart"), unsafe_allow_html=True)
             with c_h2: st.markdown(render_south_indian_chart(res['g_planets'], "Girl's Rashi Chart"), unsafe_allow_html=True)
         elif input_method == "Birth Details" and not res.get('b_planets'):
-            st.info("💡 Tip: Enable 'Generate Full Horoscopes' to see visual charts & Dasha.")
+            st.info("💡 Tip: Enable 'Generate Full Horoscopes' to see visual charts.")
 
         st.markdown("### 📋 Quick Scan")
         for item in res['bd']:
