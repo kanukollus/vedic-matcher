@@ -68,7 +68,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v38_ancient_wisdom", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v38_final_fixed", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -139,7 +139,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
     score = 0; bd = []; 
-    # Use a structured list for detailed breakdown
     cancellations = [] 
     
     # 1. Varna
@@ -268,7 +267,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
 
     return score, bd, cancellations, rajju_status, vedha_status
 
-# --- DISCOVERY LOGIC (TAB 2) ---
+# --- DISCOVERY LOGIC ---
 def find_best_matches(source_gender, s_nak, s_rashi):
     matches = []
     for i in range(27):
@@ -294,7 +293,7 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             })
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
-# --- ROBUST AI HANDLER (DYNAMIC LIST & TRY-ALL) ---
+# --- ROBUST AI HANDLER ---
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
@@ -406,10 +405,6 @@ with tabs[0]:
             fig = go.Figure(go.Indicator(mode = "gauge", value = res['score'], gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
-            
-
-[Image of gauge chart]
-
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
@@ -496,31 +491,26 @@ with tabs[2]:
 with tabs[3]:
     st.header("🤖 Guru AI")
     
-    # CONTEXT AWARENESS LOGIC
     context = "You are a Vedic Astrologer."
     suggestions = ["Best wedding colors?", "Remedies for Nadi Dosha?", "Explain Rajju Dosha"]
     
     if st.session_state.calculated:
         r = st.session_state.results
         context += f" Match Context: Boy {r['b_n']}, Girl {r['g_n']}. Score: {r['score']}/36. Doshas: Rajju={r['rajju']}, Vedha={r['vedha']}."
-        # SMART SUGGESTIONS
         suggestions = ["Analyze this match detailed", "Any remedies needed?", "Is this good for marriage?"]
         if r['rajju'] == "Fail": suggestions.append("Remedies for Rajju Dosha")
         if r['score'] < 18: suggestions.append("Why is the score low?")
         st.success(f"Context Loaded: {r['b_n']} ❤️ {r['g_n']}")
 
-    # API KEY LOGIC (CHECK SECRETS FIRST)
     user_key = st.secrets.get("GEMINI_API_KEY", None)
     if not user_key:
         user_key = st.text_input("API Key (Get at aistudio.google.com)", type="password")
     
-    # BUTTONS FOR SUGGESTIONS
     cols = st.columns(3)
     clicked_prompt = None
     for i, s in enumerate(suggestions):
         if cols[i%3].button(s, use_container_width=True): clicked_prompt = s
 
-    # CHAT UI
     if user_key:
         for m in st.session_state.messages:
             with st.chat_message(m["role"]): st.write(m["content"])
