@@ -21,16 +21,13 @@ st.markdown("""
     .guna-header { font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; color: #31333F; }
     .guna-score { font-weight: bold; }
     .guna-reason { font-size: 14px; color: #555; margin-top: 5px; font-style: italic; }
-    
     .border-green { border-left-color: #00cc00 !important; }
     .border-orange { border-left-color: #ffa500 !important; }
     .border-red { border-left-color: #ff4b4b !important; }
-    
     .text-green { color: #00cc00 !important; }
     .text-orange { color: #ffa500 !important; }
     .text-red { color: #ff4b4b !important; }
     
-    /* CHART STYLES */
     .chart-container {
         display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px);
         gap: 2px; background-color: #444; border: 2px solid #333; width: 100%; max-width: 350px; margin: auto; font-size: 10px;
@@ -44,7 +41,6 @@ st.markdown("""
         display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: #555;
     }
     
-    /* VERDICT BOX */
     .verdict-box {
         background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20;
     }
@@ -69,7 +65,6 @@ VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
 YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
 YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
 RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
-# RESTORED MAITRI TABLE
 MAITRI_TABLE = [[5, 5, 5, 4, 5, 0, 0], [5, 5, 4, 1, 4, 1, 1], [5, 4, 5, 0.5, 5, 3, 0.5],[4, 1, 0.5, 5, 0.5, 5, 4], [5, 4, 5, 0.5, 5, 0.5, 3], [0, 1, 3, 5, 0.5, 5, 5], [0, 1, 0.5, 4, 3, 5, 5]]
 GANA_TYPE = [0, 1, 2, 1, 0, 1, 0, 0, 2, 2, 1, 1, 0, 2, 0, 2, 0, 2, 2, 1, 1, 0, 2, 2, 1, 1, 0]
 GANA_NAMES = ["Deva (Divine)", "Manushya (Human)", "Rakshasa (Demon)"]
@@ -83,7 +78,7 @@ DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v46_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v47_unpack_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -209,7 +204,8 @@ def calculate_current_dasha(moon_long, birth_date):
     return curr_lord, tones.get(curr_lord, "General Growth")
 
 def analyze_aspects_and_occupation(chart_data, moon_rashi):
-    if not chart_data: return [], "Unknown"
+    if not chart_data: return [] # FIXED: Returns 1 value now
+    
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
     
@@ -385,8 +381,8 @@ with tabs[0]:
                 
                 b_obs, g_obs = [], []
                 if pro_mode and b_planets:
-                    b_obs, _ = analyze_aspects_and_occupation(b_planets, b_rashi)
-                    g_obs, _ = analyze_aspects_and_occupation(g_planets, g_rashi)
+                    b_obs = analyze_aspects_and_occupation(b_planets, b_rashi)
+                    g_obs = analyze_aspects_and_occupation(g_planets, g_rashi)
                 
                 human_verdict = generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha_name, g_dasha_name)
 
