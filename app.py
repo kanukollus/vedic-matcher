@@ -52,7 +52,7 @@ if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth De
 
 # --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
-RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
+RASHIS = ["Aries", "Taurus", "Gemini", "Cancer","Leo", "Virgo", "Libra", "Scorpio","Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 SOUTH_CHART_MAP = {11: 0, 0: 1, 1: 2, 2: 3, 10: 4, 3: 7, 9: 8, 4: 11, 8: 12, 7: 13, 6: 14, 5: 15}
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
 SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
@@ -70,7 +70,7 @@ SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shr
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v40_1_full", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v41_context_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -271,6 +271,16 @@ def find_best_matches(source_gender, s_nak, s_rashi):
             matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
+# --- NEW: CHART FORMATTER FOR AI ---
+def format_chart_for_ai(chart_data):
+    if not chart_data: return "Chart not generated."
+    readable = []
+    for rashi_idx, planets in chart_data.items():
+        if planets:
+            readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+    return "; ".join(readable)
+
+# --- ROBUST AI HANDLER ---
 def handle_ai_query(prompt, context_str, key):
     try:
         genai.configure(api_key=key)
@@ -433,17 +443,24 @@ with tabs[1]:
 with tabs[2]:
     st.header("💍 Wedding Dates"); t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
     if st.button("Check Auspicious Dates"):
-        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years")
+        r_idx = RASHIS.index(t_rashi); st.subheader("Lucky Years"); 
         for y, s in predict_marriage_luck_years(r_idx): st.write(f"**{y}:** {s}")
         st.subheader("Lucky Month"); st.info(f"❤️ **{predict_wedding_month(r_idx)}**")
 
 with tabs[3]:
     st.header("🤖 Guru AI"); user_key = st.secrets.get("GEMINI_API_KEY", None)
     if not user_key: user_key = st.text_input("API Key (aistudio.google.com)", type="password")
+    
+    # NEW: CONTEXT BUILDER WITH CHARTS
     context = "You are a Vedic Astrologer."
     if st.session_state.calculated: 
         r = st.session_state.results
         context += f" Match Context: Boy {r['b_n']}, Girl {r['g_n']}. Score: {r['score']}/36."
+        if r.get('b_planets') and r.get('g_planets'):
+            b_txt = format_chart_for_ai(r['b_planets'])
+            g_txt = format_chart_for_ai(r['g_planets'])
+            context += f" Boy Chart: {b_txt}. Girl Chart: {g_txt}."
+            
     suggestions = ["Analyze this match", "Remedies?", "Is this good for marriage?"]
     cols = st.columns(3); clicked = None
     for i, s in enumerate(suggestions): 
@@ -458,6 +475,7 @@ with tabs[3]:
                     ans = handle_ai_query(final_prompt, context, user_key)
                     st.write(ans); st.session_state.messages.append({"role": "assistant", "content": ans})
 
+# --- RESTORED FULL FOOTER ---
 st.divider()
 with st.expander("ℹ️ How to Read Results & Disclaimer"):
     st.markdown("""
