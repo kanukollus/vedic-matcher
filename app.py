@@ -21,13 +21,16 @@ st.markdown("""
     .guna-header { font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; color: #31333F; }
     .guna-score { font-weight: bold; }
     .guna-reason { font-size: 14px; color: #555; margin-top: 5px; font-style: italic; }
+    
     .border-green { border-left-color: #00cc00 !important; }
     .border-orange { border-left-color: #ffa500 !important; }
     .border-red { border-left-color: #ff4b4b !important; }
+    
     .text-green { color: #00cc00 !important; }
     .text-orange { color: #ffa500 !important; }
     .text-red { color: #ff4b4b !important; }
     
+    /* CHART STYLES */
     .chart-container {
         display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px);
         gap: 2px; background-color: #444; border: 2px solid #333; width: 100%; max-width: 350px; margin: auto; font-size: 10px;
@@ -41,14 +44,11 @@ st.markdown("""
         display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: #555;
     }
     
+    /* VERDICT BOX */
     .verdict-box {
         background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20;
     }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
-    
-    .dasha-box {
-        background-color: #e3f2fd; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 14px; border-left: 4px solid #2196f3;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -63,16 +63,27 @@ NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra",
 RASHIS = ["Aries", "Taurus", "Gemini", "Cancer","Leo", "Virgo", "Libra", "Scorpio","Sagittarius", "Capricorn", "Aquarius", "Pisces"]
 SOUTH_CHART_MAP = {11: 0, 0: 1, 1: 2, 2: 3, 10: 4, 3: 7, 9: 8, 4: 11, 8: 12, 7: 13, 6: 14, 5: 15}
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
-# Vimshottari Dasha Order and Years
+SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
+VARNA_GROUP = [0, 1, 2, 0, 1, 2, 2, 0, 1, 2, 2, 0]
+VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
+YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
+YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
+RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
+# RESTORED MAITRI TABLE
+MAITRI_TABLE = [[5, 5, 5, 4, 5, 0, 0], [5, 5, 4, 1, 4, 1, 1], [5, 4, 5, 0.5, 5, 3, 0.5],[4, 1, 0.5, 5, 0.5, 5, 4], [5, 4, 5, 0.5, 5, 0.5, 3], [0, 1, 3, 5, 0.5, 5, 5], [0, 1, 0.5, 4, 3, 5, 5]]
+GANA_TYPE = [0, 1, 2, 1, 0, 1, 0, 0, 2, 2, 1, 1, 0, 2, 0, 2, 0, 2, 2, 1, 1, 0, 2, 2, 1, 1, 0]
+GANA_NAMES = ["Deva (Divine)", "Manushya (Human)", "Rakshasa (Demon)"]
+NADI_TYPE = [0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2, 0, 1, 2, 2, 1, 0, 0, 1, 2]
+NADI_NAMES = ["Adi (Start)", "Madhya (Middle)", "Antya (End)"]
+SAME_NAKSHATRA_ALLOWED = ["Rohini", "Ardra", "Pushya", "Magha", "Vishakha", "Shravana", "Uttara Bhadrapada", "Revati"]
+NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
+# Dasha Data
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
-# Special Aspects: Planet -> [Houses it looks at relative to itself]
-SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]} 
-# Note: For others, standard is 7th only.
+SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
 
-# --- UTILS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v46_empathetic_ai", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v46_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -110,14 +121,14 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     chart_data = None
     if detailed:
         bodies = [ephem.Sun(), ephem.Moon(), ephem.Mars(), ephem.Mercury(), ephem.Jupiter(), ephem.Venus(), ephem.Saturn()]
-        names = ["Sun", "Moon", "Mars", "Merc", "Jup", "Ven", "Sat"] # Full names for dict keys
+        names = ["Sun", "Moon", "Mars", "Merc", "Jup", "Ven", "Sat"]
         chart_data = {}
         for body, name in zip(bodies, names):
             body.compute(obs)
             long = (math.degrees(ephem.Ecliptic(body).lon) - ayanamsa) % 360
             r_idx = int(long / 30)
             if r_idx not in chart_data: chart_data[r_idx] = []
-            chart_data[r_idx].append(name) # Store full names for aspect logic
+            chart_data[r_idx].append(name)
 
     return s_moon, s_mars, s_sun, msg, chart_data
 
@@ -133,11 +144,10 @@ def check_mars_dosha_smart(moon_rashi, mars_long):
     return False, "Safe"
 
 def render_south_indian_chart(positions, title):
-    # positions dict now uses full names like 'Sun', 'Mars'. Need to shorten for display
     grid_items = [""] * 16
     for rashi_idx, planets in positions.items():
         if rashi_idx in SOUTH_CHART_MAP:
-            short_planets = [p[:2] for p in planets] # Shorten to Su, Mo, Ma
+            short_planets = [p[:2] for p in planets]
             grid_pos = SOUTH_CHART_MAP[rashi_idx]
             grid_items[grid_pos] = "<br>".join(short_planets)
     return f"""
@@ -160,13 +170,10 @@ def render_south_indian_chart(positions, title):
 
 # --- NEW: DASHA & ASPECT CALCULATOR ---
 def calculate_current_dasha(moon_long, birth_date):
-    # Nakshatra span is 13.333 deg
     nak_idx = int(moon_long / 13.333333)
     deg_in_nak = moon_long % 13.333333
     fraction_passed = deg_in_nak / 13.333333
     
-    # Map Nakshatra to Lord (Ketu starts at Ashwini, Magha, Mula - 0, 9, 18)
-    # The sequence of lords is always the same 9 planets repeating
     lord_seq_idx = nak_idx % 9
     start_lord = DASHA_ORDER[lord_seq_idx]
     total_years = DASHA_YEARS[start_lord]
@@ -177,28 +184,21 @@ def calculate_current_dasha(moon_long, birth_date):
     age_days = (current_date - birth_dt).days
     age_years = age_days / 365.25
     
-    # Traverse Dasha
-    passed = 0
     curr_lord = start_lord
     rem_balance = balance_years
     
-    # Check if still in birth dasha
-    if age_years < rem_balance:
-        return curr_lord, "Growth & Foundation"
+    if age_years < rem_balance: return curr_lord, "Growth & Foundation"
     
     age_years -= rem_balance
     curr_idx = lord_seq_idx
     
-    # Loop through subsequent dashas
     while True:
         curr_idx = (curr_idx + 1) % 9
         curr_lord = DASHA_ORDER[curr_idx]
         years = DASHA_YEARS[curr_lord]
-        if age_years < years:
-            break
+        if age_years < years: break
         age_years -= years
         
-    # Tone mapping for Dasha
     tones = {
         "Jupiter": "Wisdom & Expansion", "Saturn": "Maturity & Discipline",
         "Mercury": "Communication & Business", "Ketu": "Introspection & Spirituality",
@@ -210,85 +210,64 @@ def calculate_current_dasha(moon_long, birth_date):
 
 def analyze_aspects_and_occupation(chart_data, moon_rashi):
     if not chart_data: return [], "Unknown"
-    
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
     
-    # 1. Occupation (Who is IN the 7th house)
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
         if any(p in ["Sat", "Mars", "Rahu", "Ketu", "Sun"] for p in occupants):
-            observations.append(f"ℹ️ **Occupants:** {names} in 7th House. Brings intensity/seriousness to relationships.")
+            observations.append(f"ℹ️ **Occupants:** {names} in 7th House. Brings intensity.")
         elif any(p in ["Jup", "Ven", "Merc"] for p in occupants):
-            observations.append(f"✅ **Occupants:** {names} in 7th House. Brings harmony and support.")
+            observations.append(f"✅ **Occupants:** {names} in 7th House. Brings harmony.")
             
-    # 2. Aspects (Who is LOOKING AT the 7th house)
     aspectors = []
     for r_idx, planets in chart_data.items():
-        dist = (house_7_idx - r_idx) % 12 + 1 # Distance from planet to 7th house
+        dist = (house_7_idx - r_idx) % 12 + 1 
         for p in planets:
-            # Check special aspects
-            if p in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p]:
-                aspectors.append(p)
-            # Check standard 7th aspect (all planets)
-            elif dist == 7:
-                aspectors.append(p)
+            if p in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p]: aspectors.append(p)
+            elif dist == 7: aspectors.append(p)
                 
     if aspectors:
-        # Filter duplicates (e.g. if Mars is in 1st, it aspects 7th by occupation (dist 7) and special? No, special logic handles occupation separately)
-        # Just unique list
         aspectors = list(set(aspectors))
-        
-        # Tone for aspects
-        if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Aspect:** Adds stability and long-term commitment, but requires patience.")
-        if "Mars" in aspectors: observations.append("ℹ️ **Mars' Aspect:** Adds energy and passion; keep communication calm.")
-        if "Jup" in aspectors: observations.append("✅ **Jupiter's Aspect:** A strong blessing of protection and wisdom for the marriage.")
+        if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Aspect:** Stability with patience.")
+        if "Mars" in aspectors: observations.append("ℹ️ **Mars' Aspect:** Energy and passion.")
+        if "Jup" in aspectors: observations.append("✅ **Jupiter's Aspect:** Blessing of protection.")
         
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     verdict = ""
-    # 1. Score
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
     
-    # 2. Dosha
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
     
-    # 3. Dasha (Timing)
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
-    else:
-        verdict += "These periods complement each other well for growth."
+    else: verdict += "These periods complement each other well for growth."
         
-    # 4. Planetary
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
-        verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time and understanding."
+        verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
     elif any("Occupants" in o for o in b_obs + g_obs):
         verdict += "Planets occupying the 7th house add specific flavors (energy or wisdom) to the bond."
-    else:
-        verdict += "The planetary positions are largely neutral, leaving the relationship's success in your own hands."
-        
+    else: verdict += "The planetary positions are largely neutral, leaving the relationship's success in your own hands."
     return verdict
 
-# --- CORE CALCULATION (Same as before) ---
+# --- CORE CALCULATION ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
-    # (Same standard logic as v44.1, condensed for brevity)
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
     score = 0; bd = []; logs = []
     
-    # Varna
     v = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     if v == 0 and friends: v=1; logs.append({"Attr": "Varna", "Fix": "Maitri"})
     score += v; bd.append(("Varna", 1 if v else 0, v, 1, ""))
     
-    # Vashya
     va = 0; 
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va = 1
@@ -297,14 +276,12 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     if va < 2 and (friends or YONI_ID[b_nak]==YONI_ID[g_nak]): va_f=2; logs.append({"Attr": "Vashya", "Fix": "Maitri/Yoni"})
     score += va_f; bd.append(("Vashya", va, va_f, 2, ""))
     
-    # Tara
     cnt = (b_nak - g_nak)%27 + 1
     t = 3 if cnt%9 not in [3,5,7] else 0
     t_f = t
     if t == 0 and friends: t_f=3; logs.append({"Attr": "Tara", "Fix": "Maitri"})
     score += t_f; bd.append(("Tara", t, t_f, 3, ""))
     
-    # Yoni
     y = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_f = y
     if y < 4 and (friends or va_f>=1): y_f=4; logs.append({"Attr": "Yoni", "Fix": "Maitri/Vashya"})
@@ -312,21 +289,18 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     score += maitri_raw; bd.append(("Maitri", maitri_raw, maitri_raw, 5, ""))
     
-    # Gana
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga = 6 if gb==gg else (0 if (gg==1 and gb==2) or (gg==2 and gb==1) else 1)
     ga_f = ga
     if ga < 6 and friends: ga_f=6; logs.append({"Attr": "Gana", "Fix": "Maitri"})
     score += ga_f; bd.append(("Gana", ga, ga_f, 6, ""))
     
-    # Bhakoot
     d = (b_rashi-g_rashi)%12
     bh = 7 if d not in [1,11,4,8,5,7] else 0
     bh_f = bh
     if bh == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): bh_f=7; logs.append({"Attr": "Bhakoot", "Fix": "Maitri"})
     score += bh_f; bd.append(("Bhakoot", bh, bh_f, 7, ""))
     
-    # Nadi
     n = 8; n_f = 8
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
         n = 0; n_f = 0
@@ -335,7 +309,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
         elif friends: n_f=8; logs.append({"Attr": "Nadi", "Fix": "Maitri"})
     score += n_f; bd.append(("Nadi", n, n_f, 8, ""))
     
-    # South
     rg = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
     r_stat = "Fail" if rg[b_nak] == rg[g_nak] else "Pass"
     if r_stat == "Fail" and (friends or b_rashi == g_rashi): r_stat = "Cancelled"
@@ -364,12 +337,12 @@ with tabs[0]:
         with c1:
             st.markdown("### 🤵 Boy")
             b_date = st.date_input("Date", datetime.date(1995,1,1), key="b_d")
-            b_time = st.time_input("Time", datetime.time(10,0), key="b_t")
+            b_time = st.time_input("Time", datetime.time(10,0), step=60, key="b_t")
             b_city = st.text_input("City", "Hyderabad", key="b_c")
         with c2:
             st.markdown("### 👰 Girl")
             g_date = st.date_input("Date", datetime.date(1994,11,28), key="g_d")
-            g_time = st.time_input("Time", datetime.time(7,30), key="g_t")
+            g_time = st.time_input("Time", datetime.time(7,30), step=60, key="g_t")
             g_city = st.text_input("City", "Hyderabad", key="g_c")
         st.markdown("---")
         pro_mode = st.toggle("✨ Generate Full Horoscopes (Pro Feature)")
@@ -400,8 +373,6 @@ with tabs[0]:
                     b_nak, b_rashi = get_nak_rashi(b_moon)
                     g_nak, g_rashi = get_nak_rashi(g_moon)
                     b_planets, g_planets = b_chart, g_chart
-                    
-                    # Dasha Calculation (New)
                     if pro_mode:
                         b_dasha_name, b_dasha_tone = calculate_current_dasha(b_moon, b_date)
                         g_dasha_name, g_dasha_tone = calculate_current_dasha(g_moon, g_date)
@@ -412,7 +383,6 @@ with tabs[0]:
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi)
                 
-                # Analysis
                 b_obs, g_obs = [], []
                 if pro_mode and b_planets:
                     b_obs, _ = analyze_aspects_and_occupation(b_planets, b_rashi)
@@ -514,8 +484,7 @@ with tabs[0]:
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
             st.write(f"**Boy Mars:** {bm}"); st.write(f"**Girl Mars:** {gm}")
 
-# --- OTHER TABS (Same as before) ---
-# (Tab 2, 3, 4 are identical to previous version, condensed for length limits)
+# --- OTHER TABS ---
 with tabs[1]:
     st.header("🔍 Match Finder"); st.caption("Find the best compatible stars for you.")
     col_f1, col_f2 = st.columns(2)
@@ -566,4 +535,20 @@ with tabs[3]:
 
 st.divider()
 with st.expander("ℹ️ How to Read Results & Disclaimer"):
-    st.markdown("### The Score (Gunas)\n* **18-24:** Good.\n* **25+:** Excellent.\n\n### Critical Checks\n* **Rajju:** Physical safety.\n* **Nadi:** Health/Genes.\n\n⚠️ **Disclaimer:** This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features are powered by Google Gemini. Calculations are based on Lahiri Ayanamsa. This is for informational purposes only; please consult a human astrologer for final marriage decisions.")
+    st.markdown("""
+    ### **1. The Score (Gunas)**
+    * **18-24:** Good Match.
+    * **25-36:** Excellent Match.
+    * **Below 18:** Not recommended without remedies.
+
+    ### **2. The Critical Checks (Doshas)**
+    * **Rajju (Body):** Must be 'Pass'. Indicates physical safety.
+    * **Vedha (Enemy):** Must be 'Pass'. Indicates conflict.
+    * **Nadi (Genes):** Critical for health/lineage.
+
+    ### **3. Mars (Mangal) Dosha**
+    * Checks if Mars energy is balanced between the couple.
+    * *Note: This app automatically checks for cancellations (e.g., Mars in own house).*
+    """)
+    st.caption("----------------------------------------------------------------")
+    st.caption("⚠️ **Disclaimer:** This tool combines North Indian Ashta Koota and South Indian Das Porutham logic. AI features are powered by Google Gemini. Calculations are based on Lahiri Ayanamsa. This is for informational purposes only; please consult a human astrologer for final marriage decisions.")
