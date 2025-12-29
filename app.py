@@ -9,6 +9,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import google.generativeai as genai
 import time
+from fpdf import FPDF
+import base64
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
@@ -92,9 +94,115 @@ SYNERGY_MEANINGS = {
     "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths."
 }
 
+# --- PDF GENERATOR ---
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'Vedic Matcher Pro - Compatibility Report', 0, 1, 'C')
+        self.ln(5)
+
+    def chapter_title(self, title):
+        self.set_font('Arial', 'B', 12)
+        self.set_fill_color(240, 242, 246)
+        self.cell(0, 10, title, 0, 1, 'L', 1)
+        self.ln(2)
+
+    def chapter_body(self, body):
+        self.set_font('Arial', '', 10)
+        self.multi_cell(0, 6, body)
+        self.ln()
+
+def generate_pdf(res):
+    pdf = PDFReport()
+    pdf.add_page()
+    
+    # 1. Basics
+    pdf.chapter_title("1. Birth Details")
+    details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
+    pdf.chapter_body(details)
+    
+    # 2. Verdict
+    pdf.chapter_title("2. The Verdict")
+    score_txt = f"Score: {res['score']} / 36"
+    status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, f"{score_txt} - {status}", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    
+    if st.session_state.ai_pitch:
+        pdf.ln(2)
+        pdf.set_font('Arial', 'I', 10)
+        pdf.multi_cell(0, 6, f"AI Insight: {st.session_state.ai_pitch}")
+        pdf.set_font('Arial', '', 10)
+    pdf.ln(5)
+
+    # 3. Guna Table
+    pdf.chapter_title("3. Guna Analysis & Logic")
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(40, 7, "Attribute", 1)
+    pdf.cell(30, 7, "Score", 1)
+    pdf.cell(120, 7, "Reason / Fix", 1)
+    pdf.ln()
+    pdf.set_font('Arial', '', 10)
+    
+    for item in res['bd']:
+        attr, raw, final, mx, reason = item
+        # Check if there's a fix log for this attribute
+        fix_txt = reason
+        for log in res['logs']:
+            if log['Attribute'] == attr:
+                fix_txt = f"{reason} (Fix: {log['Fix']})"
+        
+        pdf.cell(40, 7, attr, 1)
+        pdf.cell(30, 7, f"{final}/{mx}", 1)
+        pdf.cell(120, 7, fix_txt, 1)
+        pdf.ln()
+    pdf.ln(5)
+
+    # 4. Layman Analysis
+    pdf.chapter_title("4. Key Dosha Analysis (Layman Terms)")
+    r_stat = "Pass (Physical compatibility good)" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail (Physical incompatibility)"
+    v_stat = "Pass (No energy blocks)" if res['vedha'] == "Pass" else "Fail (Energy obstruction)"
+    pdf.chapter_body(f"Rajju (Body): {r_stat}")
+    pdf.chapter_body(f"Vedha (Obstruction): {v_stat}")
+    
+    bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
+    gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
+    pdf.chapter_body(f"Boy Mars: {bm}")
+    pdf.chapter_body(f"Girl Mars: {gm}")
+    
+    # 5. Planetary Data (Text Format)
+    if res.get('b_planets'):
+        pdf.add_page()
+        pdf.chapter_title("5. Planetary Positions (Detailed)")
+        
+        # Helper to format dict to string
+        def dict_to_str(chart):
+            if not chart: return "N/A"
+            lines = []
+            for r_idx, planets in chart.items():
+                r_name = RASHIS[r_idx].split(' ')[0]
+                lines.append(f"{r_name}: {', '.join(planets)}")
+            return "\n".join(lines)
+
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Boy's Rashi (D1):", 0, 1); pdf.set_font('Arial', '', 10)
+        pdf.multi_cell(0, 6, dict_to_str(res['b_planets'])); pdf.ln(3)
+        
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Girl's Rashi (D1):", 0, 1); pdf.set_font('Arial', '', 10)
+        pdf.multi_cell(0, 6, dict_to_str(res['g_planets'])); pdf.ln(3)
+        
+        if res.get('b_d9'):
+            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Boy's Navamsa (D9):", 0, 1); pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 6, dict_to_str(res['b_d9'])); pdf.ln(3)
+            
+            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Girl's Navamsa (D9):", 0, 1); pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 6, dict_to_str(res['g_d9'])); pdf.ln(3)
+
+    return pdf.output(dest='S').encode('latin-1', 'replace') # Return bytes
+
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v78_layman", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v79_pdf", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -177,7 +285,6 @@ def check_mars_dosha_smart(moon_rashi, mars_long):
     if house_diff in [2, 4, 7, 8, 12]:
         if mars_rashi == 0 or mars_rashi == 7: return False, f"✅ Balanced (Mars in Own Sign - House {house_diff})"
         elif mars_rashi == 9: return False, f"✅ Balanced (Mars Exalted - House {house_diff})"
-        # LAYMAN TRANSLATION: "Active Energy" -> "High Intensity"
         return True, f"🔥 **High Intensity (House {house_diff}):** Mars influences {('Longevity & Intimacy' if house_diff==8 else ('Marriage Partnership' if house_diff==7 else 'Family/Temper'))}. Brings deep passion but requires a strong partner."
     return False, "✨ **Calm:** Mars is placed peacefully. No aggressive energy spikes."
 
@@ -458,12 +565,11 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
     return score, bd, logs, rajju_status, vedha_status
 
-# --- RESTORED HELPER FUNCTIONS (Including find_best_matches) ---
 def format_chart_for_ai(chart_data):
     if not chart_data: return "Chart not generated."
     readable = []
-    for rashi_idx, planets in chart_data.items():
-        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+    for r_idx, planets in chart_data.items():
+        if planets: readable.append(f"{RASHIS[r_idx]}: {', '.join(planets)}")
     return "; ".join(readable)
 
 def get_jupiter_position_for_year(year):
@@ -583,7 +689,8 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
+            # FIX: DEFAULT SELECTION FOR GIRL
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
@@ -758,15 +865,11 @@ with tabs[0]:
                 st.table(pd.DataFrame(res['logs']))
         
         with st.expander("🪐 Mars & Dosha Analysis"):
-            # LAYMAN TRANSLATION FOR DOSHAS
-            r_stat = "✅ **Pass:** Physical & biological compatibility is good." if res['rajju'] == "Pass" or res['rajju'] == "Cancelled" else "⚠️ **Fail:** Potential physical incompatibility."
-            v_stat = "✅ **Pass:** No energetic blocks." if res['vedha'] == "Pass" else "⚠️ **Fail:** Energies naturally obstruct each other."
-            st.markdown(f"**Rajju (Body):** {r_stat}")
-            st.markdown(f"**Vedha (Obstruction):** {v_stat}")
-            st.markdown("---")
-            # MARS ANALYSIS
+            st.write(f"**Rajju:** {res['rajju']} (Body Check)"); st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
+            # Fix Display Tuple Bug
             bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
+            st.write(f"**Boy Mars:** {bm}"); st.write(f"**Girl Mars:** {gm}")
             
             # Compare Mars Logic
             b_is_dosha = res['b_mars'][0] if isinstance(res['b_mars'], tuple) else False
@@ -778,9 +881,14 @@ with tabs[0]:
                 st.success("✨➕✨ **Calm Match:** Both have peaceful Mars placements. A gentle relationship.")
             else:
                 st.warning("🔥⚡✨ **Energy Mismatch:** One is High Intensity, one is Calm. This often requires active adjustment.")
-                
-            st.caption(f"Boy: {bm}")
-            st.caption(f"Girl: {gm}")
+
+    # PDF DOWNLOAD BUTTON (Only if FPDF is installed)
+    try:
+        if st.button("📄 Download Full Report"):
+            pdf_bytes = generate_pdf(res)
+            st.download_button("Click to Save PDF", data=pdf_bytes, file_name="Vedic_Match_Report.pdf", mime="application/pdf")
+    except Exception as e:
+        st.error(f"PDF Error: {e}")
 
 # --- OTHER TABS ---
 with tabs[1]:
