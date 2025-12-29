@@ -45,6 +45,8 @@ st.markdown("""
     
     .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+    
+    .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,6 +56,7 @@ if "results" not in st.session_state: st.session_state.results = {}
 if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
 if "api_key" not in st.session_state: st.session_state.api_key = ""
+if "ai_pitch" not in st.session_state: st.session_state.ai_pitch = "" # Store Elevator Pitch
 
 # --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
@@ -79,7 +82,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v75_precision", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v76_elevator_pitch", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -492,6 +495,26 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
         if best_details: matches.append(best_details)
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
+def get_shared_positions(b_chart, g_chart):
+    shared = []
+    if not b_chart or not g_chart: return []
+    
+    b_pos = {}
+    g_pos = {}
+    
+    # Flatten charts
+    for r_idx, planets in b_chart.items():
+        for p in planets: b_pos[p] = r_idx
+    for r_idx, planets in g_chart.items():
+        for p in planets: g_pos[p] = r_idx
+        
+    for p in b_pos:
+        if p in g_pos and b_pos[p] == g_pos[p]:
+            r_name = RASHIS[b_pos[p]].split(" ")[0] 
+            shared.append(f"Both have **{p}** in **{r_name}**")
+            
+    return shared
+
 # --- AUTO-DETECT MODEL ---
 def get_working_model(key):
     genai.configure(api_key=key)
@@ -551,10 +574,8 @@ with tabs[0]:
             # FIX: DEFAULT SELECTION FOR GIRL
             g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
-            try: 
-                g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
-            except StopIteration: 
-                g_def_idx = 0
+            try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
+            except StopIteration: g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
@@ -574,9 +595,12 @@ with tabs[0]:
                     
                     b_d9_rashi = calculate_d9_position(b_moon)
                     g_d9_rashi = calculate_d9_position(g_moon)
+                    
                     b_planets, g_planets = b_chart, g_chart
+                    
                     b_mars_result = check_mars_dosha_smart(b_rashi, b_mars_l)
                     g_mars_result = check_mars_dosha_smart(g_rashi, g_mars_l)
+                    
                     if pro_mode:
                         b_dasha_name, b_dasha_tone = calculate_current_dasha(b_moon, b_date)
                         g_dasha_name, g_dasha_tone = calculate_current_dasha(g_moon, g_date)
@@ -586,6 +610,7 @@ with tabs[0]:
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
+                
                 b_obs, g_obs = [], []
                 if pro_mode and b_planets:
                     b_obs = analyze_aspects_and_occupation_rich(b_planets, b_rashi)
@@ -604,6 +629,8 @@ with tabs[0]:
                     "b_dasha": f"{b_dasha_name}", "g_dasha": f"{g_dasha_name}"
                 }
                 st.session_state.calculated = True
+                # Clear previous pitch
+                st.session_state.ai_pitch = ""
         except Exception as e: st.error(f"Error: {e}")
 
     if st.session_state.calculated:
@@ -635,18 +662,35 @@ with tabs[0]:
         </div>
         """, unsafe_allow_html=True)
         
-        if st.session_state.api_key:
-            if st.button("🤖 Ask AI Guru for Details"):
-                with st.spinner("Consulting AI Guru..."):
-                    context_str = f"Match Context: Boy {res['b_n']}, Girl {res['g_n']}. Score: {res['score']}."
-                    if res.get('b_planets'): context_str += f" Boy Chart: {format_chart_for_ai(res['b_planets'])}."
-                    if res.get('g_planets'): context_str += f" Girl Chart: {format_chart_for_ai(res['g_planets'])}."
-                    ans = handle_ai_query("Analyze this match in detail.", context_str, st.session_state.api_key)
-                    st.session_state.messages.append({"role": "user", "content": "Analyze this match in detail."})
-                    st.session_state.messages.append({"role": "assistant", "content": ans})
-                    st.toast("✅ Analysis Ready! Switch to the AI Guru tab to read it.")
-        else:
-            st.info("ℹ️ Enter API Key in 'AI Guru' tab to enable deep analysis.")
+        # --- PLANETARY SYNERGY SECTION ---
+        if res.get('b_planets') and res.get('g_planets'):
+            st.markdown("### 🌌 Chart Synergy & Elevator Pitch")
+            
+            # 1. Static Shared Positions (Free)
+            shared_links = get_shared_positions(res['b_planets'], res['g_planets'])
+            if shared_links:
+                st.info("🔗 **Cosmic Links Found:**\n" + "\n".join([f"- {s}" for s in shared_links]))
+            
+            # 2. AI Elevator Pitch
+            if st.session_state.ai_pitch:
+                st.markdown(f"""<div class="synergy-box"><strong>✨ Karmic Connection (AI Insight):</strong><br>{st.session_state.ai_pitch}</div>""", unsafe_allow_html=True)
+            
+            if st.session_state.api_key:
+                if st.button("🔮 Reveal Karmic Connection (AI)"):
+                    with st.spinner("Channeling cosmic wisdom..."):
+                        b_str = format_chart_for_ai(res['b_planets'])
+                        g_str = format_chart_for_ai(res['g_planets'])
+                        prompt = f"""
+                        Act as an expert Vedic Astrologer. Compare these two charts:
+                        Boy: {b_str}
+                        Girl: {g_str}
+                        Write a 3-4 sentence 'elevator pitch' summarizing the core dynamic, spiritual potential, and karmic connection between them. Focus on the 'Why', not just the 'What'.
+                        """
+                        pitch = handle_ai_query(prompt, "You are a Vedic Astrologer.", st.session_state.api_key)
+                        st.session_state.ai_pitch = pitch
+                        st.rerun()
+            else:
+                st.caption("🔒 *Add API Key in 'Guru AI' tab to unlock the detailed spiritual elevator pitch.*")
 
         with st.expander("🧠 Show me how I concluded this"):
             st.markdown("### 1. 🤔 Thinking (Analyzing Foundation)")
@@ -672,7 +716,7 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            # NEW LAYOUT: Group by Chart Type (D1 Row, D9 Row)
+            # ROW-BASED LAYOUT
             st.markdown("### 🔮 Pro: Planetary Charts")
             
             st.markdown("**1. Rashi Chakra (D1)**")
