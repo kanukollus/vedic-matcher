@@ -12,7 +12,7 @@ import time
 from fpdf import FPDF
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="wide") # Changed to wide for better table visibility
+st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="wide")
 
 # --- CSS STYLING ---
 st.markdown("""
@@ -207,7 +207,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v84_table_layout", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v84_row_ui", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -234,38 +234,21 @@ def calculate_d9_position(longitude):
     elif d1_rashi in [3, 7, 11]: start_sign = 3 
     return (start_sign + nav_num) % 12
 
-# === NEW: RAHU/KETU/ASCENDANT LOGIC ===
 def calculate_rahu_ketu_mean(jd):
-    # Mean Node of Moon (Rahu)
     t = (jd - 2451545.0) / 36525.0
-    # Mean Longitude of the Ascending Node (Rahu)
     omega = 125.04452 - 1934.136261 * t + 0.0020708 * t * t + t * t * t / 450000.0
     rahu_long = omega % 360
     ketu_long = (rahu_long + 180) % 360
     return rahu_long, ketu_long
 
 def calculate_ascendant(observer, jd):
-    # Uses standard formula for Ascendant based on LST and Latitude
-    # 1. Get Local Sidereal Time (degrees)
     lst_rad = float(observer.sidereal_time()) 
     lat_rad = float(observer.lat)
-    
-    # 2. Obliquity of Ecliptic (approx 23.44 deg)
     eps_rad = math.radians(23.4392911)
-    
-    # 3. Formula: tan(Asc) = y / x
-    # y = cos(LST)
-    # x = - ( sin(LST) * cos(eps) + tan(lat) * sin(eps) )
     y = math.cos(lst_rad)
     x = - (math.sin(lst_rad) * math.cos(eps_rad) + math.tan(lat_rad) * math.sin(eps_rad))
-    
     asc_rad = math.atan2(y, x)
     asc_deg = math.degrees(asc_rad)
-    
-    # Ayanamsa correction (Lahiri approx)
-    # Using simplistic linear approx for Ayanamsa: ~23.85 + rate * years_since_2000
-    # Or rely on what get_planetary_positions does.
-    # Note: observer.sidereal_time gives Tropical reference. We must subtract Ayanamsa.
     return asc_deg % 360
 
 def get_d9_rashi_from_pada(nak_idx, pada):
@@ -288,16 +271,13 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
         loc = get_cached_coords(city, country)
         if loc: obs.lat, obs.lon = str(loc.latitude), str(loc.longitude)
     
-    # Base bodies
     moon = ephem.Moon(); moon.compute(obs)
     mars = ephem.Mars(); mars.compute(obs)
     sun = ephem.Sun(); sun.compute(obs)
     
-    # Ayanamsa Calculation (Lahiri)
-    # t = (jd - 2451545.0) / 36525
     jd = ephem.julian_date(obs.date)
     t = (jd - 2451545.0) / 36525.0
-    ayanamsa = 23.85 + 1.4 * t # Simplified rate
+    ayanamsa = 23.85 + 1.4 * t 
     
     s_moon = (math.degrees(ephem.Ecliptic(moon).lon) - ayanamsa) % 360
     s_mars = (math.degrees(ephem.Ecliptic(mars).lon) - ayanamsa) % 360
@@ -308,40 +288,26 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     
     if detailed:
         bodies = [ephem.Sun(), ephem.Moon(), ephem.Mars(), ephem.Mercury(), ephem.Jupiter(), ephem.Venus(), ephem.Saturn()]
-        names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"] # Short names for chart
-        
-        d1_chart_data = {}
-        d9_chart_data = {}
-        
-        # 1. Main Planets
+        names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"] 
+        d1_chart_data = {}; d9_chart_data = {}
         for body, name in zip(bodies, names):
             body.compute(obs)
             long = (math.degrees(ephem.Ecliptic(body).lon) - ayanamsa) % 360
-            
-            # D1
             r_idx_d1 = int(long / 30)
             if r_idx_d1 not in d1_chart_data: d1_chart_data[r_idx_d1] = []
             d1_chart_data[r_idx_d1].append(name)
-            
-            # D9
             r_idx_d9 = calculate_d9_position(long)
             if r_idx_d9 not in d9_chart_data: d9_chart_data[r_idx_d9] = []
             d9_chart_data[r_idx_d9].append(name)
             
-        # 2. Rahu & Ketu (Mean Node)
         rahu_l, ketu_l = calculate_rahu_ketu_mean(jd)
-        rahu_sid = (rahu_l - ayanamsa) % 360
-        ketu_sid = (ketu_l - ayanamsa) % 360
-        
-        # Add Rahu
+        rahu_sid = (rahu_l - ayanamsa) % 360; ketu_sid = (ketu_l - ayanamsa) % 360
         r_idx = int(rahu_sid / 30)
         if r_idx not in d1_chart_data: d1_chart_data[r_idx] = []
         d1_chart_data[r_idx].append("Ra")
         r_d9 = calculate_d9_position(rahu_sid)
         if r_d9 not in d9_chart_data: d9_chart_data[r_d9] = []
         d9_chart_data[r_d9].append("Ra")
-        
-        # Add Ketu
         k_idx = int(ketu_sid / 30)
         if k_idx not in d1_chart_data: d1_chart_data[k_idx] = []
         d1_chart_data[k_idx].append("Ke")
@@ -349,19 +315,14 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
         if k_d9 not in d9_chart_data: d9_chart_data[k_d9] = []
         d9_chart_data[k_d9].append("Ke")
         
-        # 3. Ascendant (Lagna)
-        asc_trop = calculate_ascendant(obs, jd) # This returns tropical roughly from formula
-        # Actually standard formula with RAMC gives Tropical Ascendant.
-        # We must subtract ayanamsa.
+        asc_trop = calculate_ascendant(obs, jd)
         asc_sid = (asc_trop - ayanamsa) % 360
-        
         a_idx = int(asc_sid / 30)
         if a_idx not in d1_chart_data: d1_chart_data[a_idx] = []
-        d1_chart_data[a_idx].append("Asc") # Lagna in D1
-        
+        d1_chart_data[a_idx].append("Asc")
         a_d9 = calculate_d9_position(asc_sid)
         if a_d9 not in d9_chart_data: d9_chart_data[a_d9] = []
-        d9_chart_data[a_d9].append("Asc") # Lagna in D9
+        d9_chart_data[a_d9].append("Asc")
 
     return s_moon, s_mars, s_sun, msg, d1_chart_data, d9_chart_data
 
@@ -378,7 +339,6 @@ def render_south_indian_chart(positions, title):
     grid_items = [""] * 16
     for rashi_idx, planets in positions.items():
         if rashi_idx in SOUTH_CHART_MAP:
-            # Use short names already in list
             grid_pos = SOUTH_CHART_MAP[rashi_idx]
             grid_items[grid_pos] = "<br>".join(planets)
     return f"""
@@ -435,31 +395,25 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
     if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
-    
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
-        if any(p in ["Sa", "Ma", "Ra", "Ke", "Su"] for p in occupants): # Updated short names
+        if any(p in ["Sa", "Ma", "Ra", "Ke", "Su"] for p in occupants): 
             observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity.")
         elif any(p in ["Ju", "Ve", "Me"] for p in occupants):
             observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony and affection.")
-            
     aspectors = []
     for r_idx, planets in chart_data.items():
         dist = (house_7_idx - r_idx) % 12 + 1 
         for p in planets:
-            # Map Short names back to Keys for SPECIAL_ASPECTS
             p_full = "Mars" if p == "Ma" else ("Jupiter" if p == "Ju" else ("Saturn" if p == "Sa" else ("Rahu" if p == "Ra" else ("Ketu" if p == "Ke" else p))))
-            
             if p_full in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p_full]: aspectors.append(p_full)
             elif dist == 7: aspectors.append(p_full)
-                
     if aspectors:
         aspectors = list(set(aspectors))
         if "Saturn" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
         if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds energy and passion, but arguments can get heated.")
         if "Jupiter" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
-        
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
@@ -467,15 +421,12 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
-    
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
-    
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
     else: verdict += "These periods complement each other well for growth."
-        
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -487,53 +438,47 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=None):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
-    
     d9_friendly = False
     if b_d9_rashi is not None and g_d9_rashi is not None:
         d9_lord_b = RASHI_LORDS[b_d9_rashi]
         d9_lord_g = RASHI_LORDS[g_d9_rashi]
         if MAITRI_TABLE[d9_lord_b][d9_lord_g] >= 4:
             d9_friendly = True
-
     score = 0; bd = []; logs = []
     
-    # 1. Varna (Muhurtha Chintamani)
+    # 1. Varna
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
-    
     fix_msg = None
     if v_raw == 0:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
-    
     if fix_msg:
         v_final = 1; reason = "Boosted by Support"
         logs.append({"Attribute": "Varna", "Problem": "Ego Conflict", "Fix": fix_msg, "Source": "Muhurtha Chintamani"})
     score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
-    # 4. Yoni (Early Calc)
+    # 4. Yoni
     y_raw = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_final = y_raw 
     
-    # 2. Vashya (Brihat Parashara)
+    # 2. Vashya
     va_raw = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va_raw = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va_raw = 0.5 
     va_final = va_raw; reason = "Magnetic" if va_raw >= 1 else "Mismatch"
-    
     fix_msg = None
     if va_raw < 2:
         if y_raw == 4: fix_msg = "Yoni is Perfect (4/4)"
         elif friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
-        
     if fix_msg: 
         va_final = 2; reason = "Boosted by Support"
         logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": "Brihat Parashara"})
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
-    # 3. Tara (Muhurtha Martanda)
+    # 3. Tara
     cnt_b_g = (g_nak - b_nak) % 27 + 1
     cnt_g_b = (b_nak - g_nak) % 27 + 1
     t1_bad = cnt_b_g % 9 in [3, 5, 7]
@@ -542,53 +487,46 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     if t1_bad and t2_bad: t_raw = 0
     elif t1_bad or t2_bad: t_raw = 1.5
     t_final = t_raw; reason = "Benefic" if t_raw == 3 else ("Mixed" if t_raw == 1.5 else "Malefic")
-    
     fix_msg = None
     if t_raw < 3:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
-        
     if fix_msg: 
         t_final = 3; reason = "Boosted by Support"
         logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": "Muhurtha Martanda"})
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
-    # 7. Bhakoot (MOVE UP - ORDER FIX)
+    # 7. Bhakoot
     dist = (b_rashi-g_rashi)%12
     bh_raw = 7 if dist not in [1, 11, 4, 8, 5, 7] else 0
     bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
-    
     fix_msg = None
     if bh_raw == 0:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]: fix_msg = "Nadi is Different (Healthy)"
-        
     if fix_msg: 
         bh_final = 7; reason = "Compensated"
         logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": fix_msg, "Source": "Brihat Samhita"})
     
-    # 4. Yoni (Finalize)
+    # 4. Yoni Final
     y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
-    
     fix_msg = None
     if y_raw < 4:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
         elif va_final >= 1: fix_msg = "Vashya is Magnetic"
-        
     if fix_msg: 
         y_final = 4; reason = "Compensated"
         logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": "Jataka Parijata"})
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
-    # 5. Maitri (Brihat Parashara)
+    # 5. Maitri
     m_final = maitri_raw
     fix_msg = None
     if maitri_raw < 5:
         if d9_friendly: fix_msg = "Navamsa Lords are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
-        
     if fix_msg:
         m_final = 5; reason = "Restored"
         logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": fix_msg, "Source": "Brihat Parashara"})
@@ -596,7 +534,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         reason = "Friendly" if m_final>=4 else "Enemy"
     score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, reason))
     
-    # 6. Gana (Peeyushadhara)
+    # 6. Gana
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga_raw = 0
     if gb == gg: ga_raw = 6
@@ -605,20 +543,18 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     elif (gb==1 and gg==2) or (gb==2 and gg==1): ga_raw = 0
     ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
     star_dist = (g_nak - b_nak) % 27 + 1
-    
     fix_msg = None
     if ga_raw < 6:
         if star_dist >= 14: fix_msg = "Star Distance > 14"
         elif friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
-        
     if fix_msg:
         ga_final = 6; reason = "Boosted"
         logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": "Peeyushadhara"})
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
-    # 7. Bhakoot (Append Score Now)
+    # 7. Bhakoot Final
     score += bh_final; bd.append(("Bhakoot", bh_raw, bh_final, 7, "Love Flow" if bh_final == 7 else "Blocked"))
     
     # 8. Nadi
@@ -845,7 +781,7 @@ with tabs[0]:
         if score_val >= 18: score_color = "#ffa500"
         if score_val >= 25: score_color = "#00cc00"
 
-        # SPLIT INTO 3 COLUMNS (Adjusted Ratios for Table)
+        # ROW 1: SCORE AND GAUGES
         c_s, c_g, c_r = st.columns([0.8, 1.2, 2.0])
         
         with c_s:
@@ -881,8 +817,6 @@ with tabs[0]:
             if res['logs']:
                 # Convert logs to DataFrame for clean display
                 df_remedies = pd.DataFrame(res['logs'])
-                # Select only key columns to save space if needed, but user asked for full table
-                # Columns in logs are: Attribute, Problem, Fix, Source
                 st.dataframe(df_remedies, hide_index=True, use_container_width=True, height=200)
             else:
                 st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
