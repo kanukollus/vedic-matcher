@@ -36,7 +36,7 @@ st.markdown("""
         background-color: #444; 
         border: 2px solid #333; 
         width: 100%; 
-        max-width: 300px; /* Reduced slightly to fit side-by-side better */
+        max-width: 300px; 
         margin: 0 auto; 
         font-size: 10px; 
     }
@@ -79,7 +79,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v74_final_auth", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v74_fixed_all", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -226,6 +226,7 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
     if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
+    
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
@@ -233,17 +234,20 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
             observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity.")
         elif any(p in ["Jup", "Ven", "Merc"] for p in occupants):
             observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony and affection.")
+            
     aspectors = []
     for r_idx, planets in chart_data.items():
         dist = (house_7_idx - r_idx) % 12 + 1 
         for p in planets:
             if p in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p]: aspectors.append(p)
             elif dist == 7: aspectors.append(p)
+                
     if aspectors:
         aspectors = list(set(aspectors))
         if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
         if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds energy and passion, but arguments can get heated.")
         if "Jup" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
+        
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
@@ -251,12 +255,15 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
+    
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
+    
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
     else: verdict += "These periods complement each other well for growth."
+        
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -396,7 +403,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
     return score, bd, logs, rajju_status, vedha_status
 
-# --- RESTORED HELPER FUNCTIONS ---
+# --- RESTORED HELPER FUNCTIONS (Including find_best_matches) ---
 def format_chart_for_ai(chart_data):
     if not chart_data: return "Chart not generated."
     readable = []
@@ -420,6 +427,31 @@ def predict_marriage_luck_years(rashi_idx):
     return predictions
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
+
+def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
+    matches = []
+    s_d9_rashi = get_d9_rashi_from_pada(s_nak, s_pada)
+    
+    for i in range(27): 
+        target_star_name = NAKSHATRAS[i]
+        best_score_for_star = -1
+        best_details = {}
+        for t_pada in range(1, 5):
+            valid_rashis = NAK_TO_RASHI_MAP[i]
+            for t_rashi_idx in valid_rashis:
+                t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
+                if source_gender == "Boy": 
+                    score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
+                else: 
+                    score, bd, logs, _, _ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+                if score > best_score_for_star:
+                    best_score_for_star = score
+                    raw_score = sum(item[1] for item in bd)
+                    reason = logs[0]['Fix'] if logs else "Standard Match"
+                    if score == 36: reason = "Perfect Match!"
+                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Score": score, "Raw Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
+        if best_details: matches.append(best_details)
+    return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
 # --- AUTO-DETECT MODEL ---
 def get_working_model(key):
@@ -477,13 +509,10 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            # FIX: DEFAULT SELECTION FOR GIRL
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
-            try: 
-                g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
-            except StopIteration: 
-                g_def_idx = 0
+            try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
+            except StopIteration: g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
@@ -503,12 +532,9 @@ with tabs[0]:
                     
                     b_d9_rashi = calculate_d9_position(b_moon)
                     g_d9_rashi = calculate_d9_position(g_moon)
-                    
                     b_planets, g_planets = b_chart, g_chart
-                    
                     b_mars_result = check_mars_dosha_smart(b_rashi, b_mars_l)
                     g_mars_result = check_mars_dosha_smart(g_rashi, g_mars_l)
-                    
                     if pro_mode:
                         b_dasha_name, b_dasha_tone = calculate_current_dasha(b_moon, b_date)
                         g_dasha_name, g_dasha_tone = calculate_current_dasha(g_moon, g_date)
@@ -518,7 +544,6 @@ with tabs[0]:
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
-                
                 b_obs, g_obs = [], []
                 if pro_mode and b_planets:
                     b_obs = analyze_aspects_and_occupation_rich(b_planets, b_rashi)
@@ -605,7 +630,6 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            # NEW LAYOUT: Group by Chart Type (D1 Row, D9 Row)
             st.markdown("### 🔮 Pro: Planetary Charts")
             
             st.markdown("**1. Rashi Chakra (D1)**")
