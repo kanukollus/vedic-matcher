@@ -44,10 +44,14 @@ st.markdown("""
     .chart-box { background-color: #fffbe6; color: #000; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #ccc; }
     .chart-center { grid-column: 2 / 4; grid-row: 2 / 4; background-color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: #555; }
     
-    .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; }
-    .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+    .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; text-align: center; }
+    .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
     
     .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
+    
+    /* CUSTOM METRIC STYLE */
+    .big-score { font-size: 48px; font-weight: bold; text-align: center; margin: 0; line-height: 1; }
+    .score-label { font-size: 14px; color: #666; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -120,16 +124,12 @@ def clean_text(text):
 def generate_pdf(res):
     pdf = PDFReport()
     pdf.add_page()
-    
-    # 1. Basics
     pdf.chapter_title(clean_text("1. Birth Details"))
     details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
     pdf.chapter_body(clean_text(details))
     
-    # 2. Verdict
     pdf.chapter_title(clean_text("2. The Verdict"))
     pdf.set_font('Arial', '', 12)
-    # PDF: Show both scores
     pdf.cell(0, 8, clean_text(f"Base Score: {res.get('raw_score', 0)} / 36"), 0, 1)
     pdf.set_font('Arial', 'B', 14)
     status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
@@ -137,13 +137,11 @@ def generate_pdf(res):
     pdf.set_font('Arial', '', 10)
     
     if st.session_state.ai_pitch:
-        pdf.ln(2)
-        pdf.set_font('Arial', 'I', 10)
+        pdf.ln(2); pdf.set_font('Arial', 'I', 10)
         pdf.multi_cell(0, 6, clean_text(f"AI Insight: {st.session_state.ai_pitch}"))
         pdf.set_font('Arial', '', 10)
     pdf.ln(5)
 
-    # 3. Guna Table
     pdf.chapter_title(clean_text("3. Guna Analysis & Logic"))
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(40, 7, clean_text("Attribute"), 1)
@@ -156,16 +154,13 @@ def generate_pdf(res):
         attr, raw, final, mx, reason = item
         fix_txt = reason
         for log in res['logs']:
-            if log['Attribute'] == attr:
-                fix_txt = f"{reason} (Fix: {log['Fix']})"
-        
+            if log['Attribute'] == attr: fix_txt = f"{reason} (Fix: {log['Fix']})"
         pdf.cell(40, 7, clean_text(attr), 1)
         pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1)
         pdf.cell(120, 7, clean_text(fix_txt), 1)
         pdf.ln()
     pdf.ln(5)
 
-    # 4. Layman Analysis
     pdf.chapter_title(clean_text("4. Key Dosha Analysis (Layman Terms)"))
     r_stat = "Pass (Physical compatibility good)" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail (Physical incompatibility)"
     v_stat = "Pass (No energy blocks)" if res['vedha'] == "Pass" else "Fail (Energy obstruction)"
@@ -177,11 +172,8 @@ def generate_pdf(res):
     pdf.chapter_body(clean_text(f"Boy Mars: {bm}"))
     pdf.chapter_body(clean_text(f"Girl Mars: {gm}"))
     
-    # 5. Planetary Data
     if res.get('b_planets'):
-        pdf.add_page()
-        pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
-        
+        pdf.add_page(); pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
         def dict_to_str(chart):
             if not chart: return "N/A"
             lines = []
@@ -192,14 +184,12 @@ def generate_pdf(res):
 
         pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
         pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_planets']))); pdf.ln(3)
-        
         pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
         pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_planets']))); pdf.ln(3)
         
         if res.get('b_d9'):
             pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
             pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_d9']))); pdf.ln(3)
-            
             pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
             pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_d9']))); pdf.ln(3)
 
@@ -207,7 +197,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v84_row_ui", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v85_strict_grid", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -781,46 +771,53 @@ with tabs[0]:
         if score_val >= 18: score_color = "#ffa500"
         if score_val >= 25: score_color = "#00cc00"
 
-        # ROW 1: SCORE AND GAUGES
-        c_s, c_g, c_r = st.columns([0.8, 1.2, 2.0])
+        # ROW 1: SCORE NUMBERS AND GAUGES
+        c1, c2, c3 = st.columns([1, 1, 1])
         
-        with c_s:
-            st.markdown(f"<h1 style='text-align: center; color: #888; margin:0;'>{res['raw_score']}</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center;'>Base Score</p>", unsafe_allow_html=True)
-            
-            st.markdown(f"<h1 style='text-align: center; color: {score_color}; margin:0;'>{res['score']}</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center;'>Remedied Score</p>", unsafe_allow_html=True)
-            
-            status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
-            st.markdown(f"<h3 style='text-align: center; color: {score_color};'>{status}</h3>", unsafe_allow_html=True)
+        with c1:
+            st.markdown(f"<div class='big-score' style='color:#888;'>{res['raw_score']}</div>", unsafe_allow_html=True)
+            st.markdown("<div class='score-label'>Base Score</div>", unsafe_allow_html=True)
         
-        with c_g:
-            # DOUBLE GAUGE
-            fig = go.Figure()
-            fig.add_trace(go.Indicator(
+        with c2:
+             fig_base = go.Figure(go.Indicator(
                 mode = "gauge+number", value = res['raw_score'],
-                domain = {'x': [0, 0.45], 'y': [0, 1]},
-                title = {'text': "Base"},
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': "#cccccc"}}
             ))
-            fig.add_trace(go.Indicator(
+             fig_base.update_layout(height=140, margin=dict(l=10, r=10, t=10, b=10))
+             st.plotly_chart(fig_base, use_container_width=True)
+
+        with c3:
+             fig_rem = go.Figure(go.Indicator(
                 mode = "gauge+number", value = res['score'],
-                domain = {'x': [0.55, 1], 'y': [0, 1]},
-                title = {'text': "Remedied"},
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}
             ))
-            fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with c_r:
+             fig_rem.update_layout(height=140, margin=dict(l=10, r=10, t=10, b=10))
+             st.plotly_chart(fig_rem, use_container_width=True)
+
+        # ROW 2: REMEDIED SCORE AND TABLE
+        c4, c5 = st.columns([1, 2])
+        
+        with c4:
+            st.markdown(f"<div class='big-score' style='color:{score_color}; margin-top: 20px;'>{res['score']}</div>", unsafe_allow_html=True)
+            st.markdown("<div class='score-label'>Remedied Score</div>", unsafe_allow_html=True)
+        
+        with c5:
             st.markdown("##### 🛡️ Applied Remedies (Dosha Bhanga)")
             if res['logs']:
-                # Convert logs to DataFrame for clean display
                 df_remedies = pd.DataFrame(res['logs'])
-                st.dataframe(df_remedies, hide_index=True, use_container_width=True, height=200)
+                st.dataframe(df_remedies, hide_index=True, use_container_width=True, height=150)
             else:
                 st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
 
+        # ROW 3: VERDICT BANNER
+        status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
+        st.markdown(f"""
+        <div style="background-color: {score_color}20; border: 2px solid {score_color}; padding: 15px; border-radius: 10px; margin-top: 20px; text-align: center;">
+            <h2 style="color: {score_color}; margin: 0;">{status}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ... (Rest of the analysis code: Verdict Box, Synergy, Charts, PDF, etc. - kept as is) ...
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
         st.caption("👆 Copy to share on WhatsApp")
