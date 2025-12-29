@@ -26,23 +26,9 @@ st.markdown("""
     .text-green { color: #00cc00 !important; }
     .text-orange { color: #ffa500 !important; }
     .text-red { color: #ff4b4b !important; }
-    
-    /* CHART STYLING */
-    .chart-container { 
-        display: grid; 
-        grid-template-columns: repeat(4, 1fr); 
-        grid-template-rows: repeat(4, 60px); 
-        gap: 2px; 
-        background-color: #444; 
-        border: 2px solid #333; 
-        width: 100%; 
-        max-width: 300px; /* Reduced slightly to fit side-by-side better */
-        margin: 0 auto; 
-        font-size: 10px; 
-    }
+    .chart-container { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px); gap: 2px; background-color: #444; border: 2px solid #333; width: 100%; max-width: 350px; margin: auto; font-size: 10px; }
     .chart-box { background-color: #fffbe6; color: #000; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #ccc; }
     .chart-center { grid-column: 2 / 4; grid-row: 2 / 4; background-color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: #555; }
-    
     .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 </style>
@@ -79,7 +65,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v72_layout_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v72_final_complete", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -189,6 +175,31 @@ def render_south_indian_chart(positions, title):
         <div class="chart-box" style="grid-column: 3; grid-row: 4;">{grid_items[14]}<br><span style='font-size:8px; color:grey'>Lib</span></div>
         <div class="chart-box" style="grid-column: 4; grid-row: 4;">{grid_items[15]}<br><span style='font-size:8px; color:grey'>Vir</span></div>
     </div>"""
+
+# --- RESTORED FUNCTIONS ---
+def format_chart_for_ai(chart_data):
+    if not chart_data: return "Chart not generated."
+    readable = []
+    for rashi_idx, planets in chart_data.items():
+        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+    return "; ".join(readable)
+
+def get_jupiter_position_for_year(year):
+    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
+    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
+
+def predict_marriage_luck_years(rashi_idx):
+    predictions = []
+    for year in [2025, 2026, 2027]:
+        jup_rashi = get_jupiter_position_for_year(year)
+        house = (jup_rashi - rashi_idx) % 12 + 1
+        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
+        predictions.append((year, res))
+    return predictions
+
+def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
 def calculate_current_dasha(moon_long, birth_date):
     nak_idx = int(moon_long / 13.333333)
@@ -614,9 +625,8 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            st.markdown("### 🔮 Pro: Planetary Charts")
-            c1, c2 = st.columns(2)
-            with c1: 
+            st.markdown("### 🔮 Pro: Planetary Charts"); c_h1, c_h2 = st.columns(2)
+            with c_h1: 
                 st.markdown(render_south_indian_chart(res['b_planets'], "Boy Rashi (D1)"), unsafe_allow_html=True)
                 if res.get('b_d9'): st.markdown(render_south_indian_chart(res['b_d9'], "Boy Navamsa (D9)"), unsafe_allow_html=True)
             with c2: 
