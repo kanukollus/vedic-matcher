@@ -10,7 +10,6 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import time
 from fpdf import FPDF
-import base64
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
@@ -29,7 +28,6 @@ st.markdown("""
     .text-orange { color: #ffa500 !important; }
     .text-red { color: #ff4b4b !important; }
     
-    /* CHART STYLING */
     .chart-container { 
         display: grid; 
         grid-template-columns: repeat(4, 1fr); 
@@ -94,7 +92,7 @@ SYNERGY_MEANINGS = {
     "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths."
 }
 
-# --- PDF GENERATOR ---
+# --- PDF GENERATOR (FIXED ENCODING) ---
 class PDFReport(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
@@ -112,71 +110,91 @@ class PDFReport(FPDF):
         self.multi_cell(0, 6, body)
         self.ln()
 
+def clean_text(text):
+    """Replaces emojis with text and strips unsupported characters for PDF."""
+    if not isinstance(text, str): return str(text)
+    
+    # Specific Replacements
+    replacements = {
+        "✅": "[PASS] ",
+        "⚠️": "[WARN] ",
+        "❌": "[FAIL] ",
+        "🔥": "[HIGH ENERGY] ",
+        "✨": "* ",
+        "🔸": "> ",
+        "🔗": "",
+        "🤖": ""
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+        
+    # Generic Clean: Encode to latin-1, replace errors with '?', then decode back
+    return text.encode('latin-1', 'replace').decode('latin-1')
+
 def generate_pdf(res):
     pdf = PDFReport()
     pdf.add_page()
     
     # 1. Basics
-    pdf.chapter_title("1. Birth Details")
+    pdf.chapter_title(clean_text("1. Birth Details"))
     details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
-    pdf.chapter_body(details)
+    pdf.chapter_body(clean_text(details))
     
     # 2. Verdict
-    pdf.chapter_title("2. The Verdict")
+    pdf.chapter_title(clean_text("2. The Verdict"))
     score_txt = f"Score: {res['score']} / 36"
     status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
     pdf.set_font('Arial', 'B', 14)
-    pdf.cell(0, 10, f"{score_txt} - {status}", 0, 1)
+    pdf.cell(0, 10, clean_text(f"{score_txt} - {status}"), 0, 1)
     pdf.set_font('Arial', '', 10)
     
     if st.session_state.ai_pitch:
         pdf.ln(2)
         pdf.set_font('Arial', 'I', 10)
-        pdf.multi_cell(0, 6, f"AI Insight: {st.session_state.ai_pitch}")
+        # Clean the AI pitch too
+        pdf.multi_cell(0, 6, clean_text(f"AI Insight: {st.session_state.ai_pitch}"))
         pdf.set_font('Arial', '', 10)
     pdf.ln(5)
 
     # 3. Guna Table
-    pdf.chapter_title("3. Guna Analysis & Logic")
+    pdf.chapter_title(clean_text("3. Guna Analysis & Logic"))
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(40, 7, "Attribute", 1)
-    pdf.cell(30, 7, "Score", 1)
-    pdf.cell(120, 7, "Reason / Fix", 1)
+    pdf.cell(40, 7, clean_text("Attribute"), 1)
+    pdf.cell(30, 7, clean_text("Score"), 1)
+    pdf.cell(120, 7, clean_text("Reason / Fix"), 1)
     pdf.ln()
     pdf.set_font('Arial', '', 10)
     
     for item in res['bd']:
         attr, raw, final, mx, reason = item
-        # Check if there's a fix log for this attribute
         fix_txt = reason
         for log in res['logs']:
             if log['Attribute'] == attr:
                 fix_txt = f"{reason} (Fix: {log['Fix']})"
         
-        pdf.cell(40, 7, attr, 1)
-        pdf.cell(30, 7, f"{final}/{mx}", 1)
-        pdf.cell(120, 7, fix_txt, 1)
+        pdf.cell(40, 7, clean_text(attr), 1)
+        pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1)
+        pdf.cell(120, 7, clean_text(fix_txt), 1)
         pdf.ln()
     pdf.ln(5)
 
     # 4. Layman Analysis
-    pdf.chapter_title("4. Key Dosha Analysis (Layman Terms)")
+    pdf.chapter_title(clean_text("4. Key Dosha Analysis (Layman Terms)"))
     r_stat = "Pass (Physical compatibility good)" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail (Physical incompatibility)"
     v_stat = "Pass (No energy blocks)" if res['vedha'] == "Pass" else "Fail (Energy obstruction)"
-    pdf.chapter_body(f"Rajju (Body): {r_stat}")
-    pdf.chapter_body(f"Vedha (Obstruction): {v_stat}")
+    pdf.chapter_body(clean_text(f"Rajju (Body): {r_stat}"))
+    pdf.chapter_body(clean_text(f"Vedha (Obstruction): {v_stat}"))
     
     bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
     gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
-    pdf.chapter_body(f"Boy Mars: {bm}")
-    pdf.chapter_body(f"Girl Mars: {gm}")
+    pdf.chapter_body(clean_text(f"Boy Mars: {bm}"))
+    pdf.chapter_body(clean_text(f"Girl Mars: {gm}"))
     
-    # 5. Planetary Data (Text Format)
+    # 5. Planetary Data
     if res.get('b_planets'):
         pdf.add_page()
-        pdf.chapter_title("5. Planetary Positions (Detailed)")
+        pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
         
-        # Helper to format dict to string
         def dict_to_str(chart):
             if not chart: return "N/A"
             lines = []
@@ -185,24 +203,24 @@ def generate_pdf(res):
                 lines.append(f"{r_name}: {', '.join(planets)}")
             return "\n".join(lines)
 
-        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Boy's Rashi (D1):", 0, 1); pdf.set_font('Arial', '', 10)
-        pdf.multi_cell(0, 6, dict_to_str(res['b_planets'])); pdf.ln(3)
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
+        pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_planets']))); pdf.ln(3)
         
-        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Girl's Rashi (D1):", 0, 1); pdf.set_font('Arial', '', 10)
-        pdf.multi_cell(0, 6, dict_to_str(res['g_planets'])); pdf.ln(3)
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
+        pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_planets']))); pdf.ln(3)
         
         if res.get('b_d9'):
-            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Boy's Navamsa (D9):", 0, 1); pdf.set_font('Arial', '', 10)
-            pdf.multi_cell(0, 6, dict_to_str(res['b_d9'])); pdf.ln(3)
+            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_d9']))); pdf.ln(3)
             
-            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, "Girl's Navamsa (D9):", 0, 1); pdf.set_font('Arial', '', 10)
-            pdf.multi_cell(0, 6, dict_to_str(res['g_d9'])); pdf.ln(3)
+            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
+            pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_d9']))); pdf.ln(3)
 
-    return pdf.output(dest='S').encode('latin-1', 'replace') # Return bytes
+    return pdf.output(dest='S').encode('latin-1', 'replace')
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v79_pdf", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v80_pdf_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
