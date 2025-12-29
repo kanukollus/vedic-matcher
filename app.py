@@ -65,7 +65,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v72_final_complete", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v73_layout_row", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -176,31 +176,6 @@ def render_south_indian_chart(positions, title):
         <div class="chart-box" style="grid-column: 4; grid-row: 4;">{grid_items[15]}<br><span style='font-size:8px; color:grey'>Vir</span></div>
     </div>"""
 
-# --- RESTORED FUNCTIONS ---
-def format_chart_for_ai(chart_data):
-    if not chart_data: return "Chart not generated."
-    readable = []
-    for rashi_idx, planets in chart_data.items():
-        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
-    return "; ".join(readable)
-
-def get_jupiter_position_for_year(year):
-    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
-    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
-    ayanamsa = 23.85 + (year - 2000) * 0.01396
-    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
-
-def predict_marriage_luck_years(rashi_idx):
-    predictions = []
-    for year in [2025, 2026, 2027]:
-        jup_rashi = get_jupiter_position_for_year(year)
-        house = (jup_rashi - rashi_idx) % 12 + 1
-        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
-        predictions.append((year, res))
-    return predictions
-
-def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
-
 def calculate_current_dasha(moon_long, birth_date):
     nak_idx = int(moon_long / 13.333333)
     deg_in_nak = moon_long % 13.333333
@@ -287,7 +262,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
     
-    # Calculate D9 Friendship (Used for smart cancellations)
     d9_friendly = False
     if b_d9_rashi is not None and g_d9_rashi is not None:
         d9_lord_b = RASHI_LORDS[b_d9_rashi]
@@ -440,6 +414,31 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
         if best_details: matches.append(best_details)
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
+# --- RESTORED HELPER FUNCTIONS ---
+def format_chart_for_ai(chart_data):
+    if not chart_data: return "Chart not generated."
+    readable = []
+    for rashi_idx, planets in chart_data.items():
+        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+    return "; ".join(readable)
+
+def get_jupiter_position_for_year(year):
+    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
+    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
+
+def predict_marriage_luck_years(rashi_idx):
+    predictions = []
+    for year in [2025, 2026, 2027]:
+        jup_rashi = get_jupiter_position_for_year(year)
+        house = (jup_rashi - rashi_idx) % 12 + 1
+        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
+        predictions.append((year, res))
+    return predictions
+
+def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
+
 # --- AUTO-DETECT MODEL ---
 def get_working_model(key):
     genai.configure(api_key=key)
@@ -496,13 +495,10 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            # FIX: DEFAULT SELECTION FOR GIRL
             g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
-            try: 
-                g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
-            except StopIteration: 
-                g_def_idx = 0
+            try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
+            except StopIteration: g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
@@ -519,15 +515,11 @@ with tabs[0]:
                     g_moon, g_mars_l, _, _, g_chart, g_d9 = get_planetary_positions(g_date, g_time, g_city, "India", detailed=pro_mode)
                     b_nak, b_rashi, b_pada = get_nak_rashi_pada(b_moon)
                     g_nak, g_rashi, g_pada = get_nak_rashi_pada(g_moon)
-                    
                     b_d9_rashi = calculate_d9_position(b_moon)
                     g_d9_rashi = calculate_d9_position(g_moon)
-                    
                     b_planets, g_planets = b_chart, g_chart
-                    
                     b_mars_result = check_mars_dosha_smart(b_rashi, b_mars_l)
                     g_mars_result = check_mars_dosha_smart(g_rashi, g_mars_l)
-                    
                     if pro_mode:
                         b_dasha_name, b_dasha_tone = calculate_current_dasha(b_moon, b_date)
                         g_dasha_name, g_dasha_tone = calculate_current_dasha(g_moon, g_date)
@@ -537,7 +529,6 @@ with tabs[0]:
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
-                
                 b_obs, g_obs = [], []
                 if pro_mode and b_planets:
                     b_obs = analyze_aspects_and_occupation_rich(b_planets, b_rashi)
@@ -587,7 +578,6 @@ with tabs[0]:
         </div>
         """, unsafe_allow_html=True)
         
-        # ASK AI GURU BRIDGE BUTTON
         if st.session_state.api_key:
             if st.button("🤖 Ask AI Guru for Details"):
                 with st.spinner("Consulting AI Guru..."):
@@ -625,13 +615,20 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            st.markdown("### 🔮 Pro: Planetary Charts"); c_h1, c_h2 = st.columns(2)
-            with c_h1: 
-                st.markdown(render_south_indian_chart(res['b_planets'], "Boy Rashi (D1)"), unsafe_allow_html=True)
-                if res.get('b_d9'): st.markdown(render_south_indian_chart(res['b_d9'], "Boy Navamsa (D9)"), unsafe_allow_html=True)
-            with c2: 
-                st.markdown(render_south_indian_chart(res['g_planets'], "Girl Rashi (D1)"), unsafe_allow_html=True)
-                if res.get('g_d9'): st.markdown(render_south_indian_chart(res['g_d9'], "Girl Navamsa (D9)"), unsafe_allow_html=True)
+            # NEW LAYOUT: Group by Chart Type (D1 Row, D9 Row)
+            st.markdown("### 🔮 Pro: Planetary Charts")
+            
+            st.markdown("**1. Rashi Chakra (D1)**")
+            c1, c2 = st.columns(2)
+            with c1: st.markdown(render_south_indian_chart(res['b_planets'], "Boy D1"), unsafe_allow_html=True)
+            with c2: st.markdown(render_south_indian_chart(res['g_planets'], "Girl D1"), unsafe_allow_html=True)
+            
+            if res.get('b_d9') and res.get('g_d9'):
+                st.markdown("---")
+                st.markdown("**2. Navamsa Chakra (D9)**")
+                c3, c4 = st.columns(2)
+                with c3: st.markdown(render_south_indian_chart(res['b_d9'], "Boy D9"), unsafe_allow_html=True)
+                with c4: st.markdown(render_south_indian_chart(res['g_d9'], "Girl D9"), unsafe_allow_html=True)
         elif input_method == "Birth Details" and not res.get('b_planets'):
             st.info("💡 Tip: Enable 'Generate Full Horoscopes' to see visual charts.")
 
