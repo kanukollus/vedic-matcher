@@ -48,6 +48,18 @@ st.markdown("""
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
     
     .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
+
+    /* NEW: REMEDY PILLS TL;DR */
+    .remedy-pill {
+        background-color: #e8f5e9; /* Light green background */
+        border-left: 4px solid #00cc00; /* Strong green accent */
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+    .remedy-title { font-weight: bold; color: #1b5e20; margin-right: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -130,7 +142,7 @@ def generate_pdf(res):
     pdf.chapter_title(clean_text("2. The Verdict"))
     pdf.set_font('Arial', '', 12)
     # PDF: Show both scores
-    pdf.cell(0, 8, clean_text(f"Raw Score: {res.get('raw_score', 0)} / 36"), 0, 1)
+    pdf.cell(0, 8, clean_text(f"Base Score: {res.get('raw_score', 0)} / 36"), 0, 1)
     pdf.set_font('Arial', 'B', 14)
     status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
     pdf.cell(0, 10, clean_text(f"Remedied Score: {res['score']} / 36 - {status}"), 0, 1)
@@ -207,7 +219,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v82_pro", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v83_tldr", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -699,7 +711,7 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
                     raw_score = sum(item[1] for item in bd)
                     reason = logs[0]['Fix'] if logs else "Standard Match"
                     if score == 36: reason = "Perfect Match!"
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Score": score, "Raw Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
+                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Score": score, "Remedied Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
         if best_details: matches.append(best_details)
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
@@ -845,23 +857,26 @@ with tabs[0]:
         if score_val >= 18: score_color = "#ffa500"
         if score_val >= 25: score_color = "#00cc00"
 
-        c_s, c_g = st.columns([1,1])
+        # SPLIT INTO 3 COLUMNS
+        c_s, c_g, c_r = st.columns([1, 1.5, 1.5])
+        
         with c_s:
             st.markdown(f"<h1 style='text-align: center; color: #888; margin:0;'>{res['raw_score']}</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center;'>Raw Score</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'>Base Score</p>", unsafe_allow_html=True)
             
             st.markdown(f"<h1 style='text-align: center; color: {score_color}; margin:0;'>{res['score']}</h1>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;'>Remedied Score</p>", unsafe_allow_html=True)
             
             status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
             st.markdown(f"<h3 style='text-align: center; color: {score_color};'>{status}</h3>", unsafe_allow_html=True)
+        
         with c_g:
             # DOUBLE GAUGE
             fig = go.Figure()
             fig.add_trace(go.Indicator(
                 mode = "gauge+number", value = res['raw_score'],
                 domain = {'x': [0, 0.45], 'y': [0, 1]},
-                title = {'text': "Raw"},
+                title = {'text': "Base"},
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': "#cccccc"}}
             ))
             fig.add_trace(go.Indicator(
@@ -872,6 +887,18 @@ with tabs[0]:
             ))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
+            
+        with c_r:
+            st.markdown("##### 🛠️ Score Boosters (TL;DR)")
+            if res['logs']:
+                for log in res['logs']:
+                    st.markdown(f"""
+                    <div class="remedy-pill">
+                        <span class="remedy-title">{log['Attribute']}</span>: {log['Fix']}
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No special Dosha cancellations (remedies) were needed based on the birth details provided.")
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
