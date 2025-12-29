@@ -12,7 +12,7 @@ import time
 from fpdf import FPDF
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="centered")
+st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="wide") # Changed to wide for better table visibility
 
 # --- CSS STYLING ---
 st.markdown("""
@@ -48,18 +48,6 @@ st.markdown("""
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
     
     .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
-
-    /* NEW: REMEDY PILLS TL;DR */
-    .remedy-pill {
-        background-color: #e8f5e9; /* Light green background */
-        border-left: 4px solid #00cc00; /* Strong green accent */
-        padding: 8px 12px;
-        margin-bottom: 8px;
-        border-radius: 4px;
-        font-size: 13px;
-        line-height: 1.4;
-    }
-    .remedy-title { font-weight: bold; color: #1b5e20; margin-right: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -219,7 +207,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v83_tldr", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v84_table_layout", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -857,8 +845,8 @@ with tabs[0]:
         if score_val >= 18: score_color = "#ffa500"
         if score_val >= 25: score_color = "#00cc00"
 
-        # SPLIT INTO 3 COLUMNS
-        c_s, c_g, c_r = st.columns([1, 1.5, 1.5])
+        # SPLIT INTO 3 COLUMNS (Adjusted Ratios for Table)
+        c_s, c_g, c_r = st.columns([0.8, 1.2, 2.0])
         
         with c_s:
             st.markdown(f"<h1 style='text-align: center; color: #888; margin:0;'>{res['raw_score']}</h1>", unsafe_allow_html=True)
@@ -889,16 +877,15 @@ with tabs[0]:
             st.plotly_chart(fig, use_container_width=True)
             
         with c_r:
-            st.markdown("##### 🛠️ Score Boosters (TL;DR)")
+            st.markdown("##### 🛡️ Applied Remedies (Dosha Bhanga)")
             if res['logs']:
-                for log in res['logs']:
-                    st.markdown(f"""
-                    <div class="remedy-pill">
-                        <span class="remedy-title">{log['Attribute']}</span>: {log['Fix']}
-                    </div>
-                    """, unsafe_allow_html=True)
+                # Convert logs to DataFrame for clean display
+                df_remedies = pd.DataFrame(res['logs'])
+                # Select only key columns to save space if needed, but user asked for full table
+                # Columns in logs are: Attribute, Problem, Fix, Source
+                st.dataframe(df_remedies, hide_index=True, use_container_width=True, height=200)
             else:
-                st.info("No special Dosha cancellations (remedies) were needed based on the birth details provided.")
+                st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
 
         share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
@@ -945,8 +932,7 @@ with tabs[0]:
             
             st.markdown("### 2. ⚙️ Harnessing (Applying Ancient Rules)")
             if res['logs']:
-                st.write(f"I applied **Dosha Bhanga** (cancellation rules) to refine the score:")
-                for l in res['logs']: st.caption(f"- {l['Attribute']}: {l['Fix']}")
+                st.write(f"I applied **Dosha Bhanga** (cancellation rules) to refine the score. See the 'Applied Remedies' table above.")
             else: st.write("No special cancellation rules were needed.")
             
             st.markdown("### 3. ⏱️ Timing (Dasha Sandhi)")
@@ -991,10 +977,6 @@ with tabs[0]:
             df = pd.DataFrame(res['bd'], columns=["Attribute", "Raw Score", "Final Score", "Max", "Logic"])
             totals = pd.DataFrame([["TOTAL", df["Raw Score"].sum(), df["Final Score"].sum(), 36, "-"]], columns=df.columns)
             st.table(pd.concat([df, totals], ignore_index=True))
-            
-        if res['logs']:
-            with st.expander("📜 Ancient Wisdom & Cancellations (Dosha Bhanga)"):
-                st.table(pd.DataFrame(res['logs']))
         
         with st.expander("🪐 Mars & Dosha Analysis"):
             st.write(f"**Rajju:** {res['rajju']} (Body Check)"); st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
