@@ -79,7 +79,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v74_fixed_all", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v75_precision", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -288,9 +288,15 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     # 1. Varna (Muhurtha Chintamani)
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
-    if v_raw == 0 and (friends or d9_friendly): 
-        v_final = 1; reason = "Boosted by Maitri/Navamsa"
-        logs.append({"Attribute": "Varna", "Problem": "Ego Conflict (0 pts)", "Fix": "Maitri or Inner Harmony (Navamsa) exists.", "Source": "Muhurtha Chintamani"})
+    
+    fix_msg = None
+    if v_raw == 0:
+        if friends: fix_msg = "Graha Maitri is Friendly"
+        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+    
+    if fix_msg:
+        v_final = 1; reason = "Boosted by Support"
+        logs.append({"Attribute": "Varna", "Problem": "Ego Conflict", "Fix": fix_msg, "Source": "Muhurtha Chintamani"})
     score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
     # 4. Yoni (Early Calc)
@@ -303,9 +309,16 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va_raw = 0.5 
     va_final = va_raw; reason = "Magnetic" if va_raw >= 1 else "Mismatch"
-    if va_raw < 2 and (friends or d9_friendly or y_raw == 4): 
-        va_final = 2; reason = "Boosted by Maitri/Navamsa/Yoni"
-        logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch ({va_raw} pts)", "Fix": "Maitri/Navamsa or Yoni Perfect.", "Source": "Brihat Parashara"})
+    
+    fix_msg = None
+    if va_raw < 2:
+        if y_raw == 4: fix_msg = "Yoni is Perfect (4/4)"
+        elif friends: fix_msg = "Graha Maitri is Friendly"
+        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        
+    if fix_msg: 
+        va_final = 2; reason = "Boosted by Support"
+        logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": "Brihat Parashara"})
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
     # 3. Tara (Muhurtha Martanda)
@@ -317,31 +330,56 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     if t1_bad and t2_bad: t_raw = 0
     elif t1_bad or t2_bad: t_raw = 1.5
     t_final = t_raw; reason = "Benefic" if t_raw == 3 else ("Mixed" if t_raw == 1.5 else "Malefic")
-    if t_raw < 3 and (friends or d9_friendly): 
-        t_final = 3; reason = "Boosted by Maitri"
-        logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": "Maitri/Navamsa Lords are friends.", "Source": "Muhurtha Martanda"})
+    
+    fix_msg = None
+    if t_raw < 3:
+        if friends: fix_msg = "Graha Maitri is Friendly"
+        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        
+    if fix_msg: 
+        t_final = 3; reason = "Boosted by Support"
+        logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": "Muhurtha Martanda"})
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
     # 7. Bhakoot (Early Calc)
     dist = (b_rashi-g_rashi)%12
     bh_raw = 7 if dist not in [1, 11, 4, 8, 5, 7] else 0
     bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
-    if bh_raw == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): 
-        bh_final = 7; reason = "Compensated by Maitri/Nadi"
-        logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": "Maitri or Nadi Clean.", "Source": "Brihat Samhita"})
     
-    # 4. Yoni (Jataka Parijata)
+    fix_msg = None
+    if bh_raw == 0:
+        if friends: fix_msg = "Graha Maitri is Friendly"
+        elif NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]: fix_msg = "Nadi is Different (Healthy)"
+        
+    if fix_msg: 
+        bh_final = 7; reason = "Compensated"
+        logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": fix_msg, "Source": "Brihat Samhita"})
+    
+    # 4. Yoni (Finalize)
     y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
-    if y_raw < 4 and (friends or d9_friendly or bh_final == 7 or va_final >= 1): 
-        y_final = 4; reason = "Compensated by Maitri/D9/Bhakoot/Vashya"
-        logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": "Maitri/Navamsa/Bhakoot/Vashya OK.", "Source": "Jataka Parijata"})
+    
+    fix_msg = None
+    if y_raw < 4:
+        if friends: fix_msg = "Graha Maitri is Friendly"
+        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
+        elif va_final >= 1: fix_msg = "Vashya is Magnetic"
+        
+    if fix_msg: 
+        y_final = 4; reason = "Compensated"
+        logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": "Jataka Parijata"})
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
     # 5. Maitri (Brihat Parashara)
     m_final = maitri_raw
-    if maitri_raw < 5 and (d9_friendly or bh_final == 7):
-        m_final = 5; reason = "Restored by D9/Bhakoot"
-        logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": "Navamsa Friends or Bhakoot Clean.", "Source": "Brihat Parashara"})
+    fix_msg = None
+    if maitri_raw < 5:
+        if d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
+        
+    if fix_msg:
+        m_final = 5; reason = "Restored"
+        logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": fix_msg, "Source": "Brihat Parashara"})
     else:
         reason = "Friendly" if m_final>=4 else "Enemy"
     score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, reason))
@@ -355,16 +393,17 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     elif (gb==1 and gg==2) or (gb==2 and gg==1): ga_raw = 0
     ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
     star_dist = (g_nak - b_nak) % 27 + 1
+    
+    fix_msg = None
     if ga_raw < 6:
-        if star_dist >= 14:
-            ga_final = 6; reason = "Boosted by Distance"
-            logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": "Star Distance >= 14.", "Source": "Peeyushadhara"})
-        elif friends or d9_friendly:
-            ga_final = 6; reason = "Boosted by Maitri"
-            logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": "Maitri/Navamsa Lords are friends.", "Source": "Peeyushadhara"})
-        elif bh_final == 7:
-            ga_final = 6; reason = "Boosted by Bhakoot"
-            logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": "Bhakoot is Clean.", "Source": "Peeyushadhara"})
+        if star_dist >= 14: fix_msg = "Star Distance > 14"
+        elif friends: fix_msg = "Graha Maitri is Friendly"
+        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
+        
+    if fix_msg:
+        ga_final = 6; reason = "Boosted"
+        logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": "Peeyushadhara"})
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
     # 7. Bhakoot (Append)
@@ -509,10 +548,13 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
+            # FIX: DEFAULT SELECTION FOR GIRL
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
-            try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
-            except StopIteration: g_def_idx = 0
+            try: 
+                g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
+            except StopIteration: 
+                g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
@@ -630,6 +672,7 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
+            # NEW LAYOUT: Group by Chart Type (D1 Row, D9 Row)
             st.markdown("### 🔮 Pro: Planetary Charts")
             
             st.markdown("**1. Rashi Chakra (D1)**")
