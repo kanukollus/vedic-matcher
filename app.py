@@ -41,35 +41,35 @@ if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
 if "api_key" not in st.session_state: st.session_state.api_key = ""
 
-# --- DATA CORRECTION ---
+# --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
 SOUTH_CHART_MAP = {11: 0, 0: 1, 1: 2, 2: 3, 10: 4, 3: 7, 9: 8, 4: 11, 8: 12, 7: 13, 6: 14, 5: 15}
 NAK_TO_RASHI_MAP = {0: [0], 1: [0], 2: [0, 1], 3: [1], 4: [1, 2], 5: [2], 6: [2, 3], 7: [3], 8: [3], 9: [4], 10: [4], 11: [4, 5], 12: [5], 13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [8], 19: [8], 20: [8, 9], 21: [9], 22: [9, 10], 23: [10], 24: [10, 11], 25: [11], 26: [11]}
 SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
 MAITRI_TABLE = [[5, 5, 5, 4, 5, 0, 0], [5, 5, 4, 1, 4, 1, 1], [5, 4, 5, 0.5, 5, 3, 0.5],[4, 1, 0.5, 5, 0.5, 5, 4], [5, 4, 5, 0.5, 5, 0.5, 3], [0, 1, 3, 5, 0.5, 5, 5], [0, 1, 0.5, 4, 3, 5, 5]]
-GANA_TYPE = [0, 1, 2, 1, 0, 1, 0, 0, 2, 2, 1, 1, 0, 2, 0, 2, 0, 2, 2, 1, 1, 0] # Corrected cycle? No, let's fix manually below
+
 # CORRECTED GANA (0=Deva, 1=Manushya, 2=Rakshasa)
 GANA_TYPE = [
     0, 1, 2, # Ashwini, Bharani, Krittika
     1, 0, 1, # Rohini, Mrigashira, Ardra
     0, 0, 2, # Punarvasu, Pushya, Ashlesha
-    2, 1, 1, # Magha, P.Phal, U.Phal (Manushya)
+    2, 1, 1, # Magha, P.Phal, U.Phal
     0, 2, 0, # Hasta, Chitra, Swati
     2, 0, 2, # Vishakha, Anuradha, Jyeshtha
     2, 1, 1, # Mula, P.Ash, U.Ash
     0, 2, 2, # Shravana, Dhanishta, Shatabhisha
-    1, 1, 0  # P.Bhad, U.Bhad, Revati (Deva)
+    1, 1, 0  # P.Bhad, U.Bhad, Revati
 ]
 GANA_NAMES = ["Deva (Divine)", "Manushya (Human)", "Rakshasa (Demon)"]
 
-# CORRECTED NADI (0=Adi, 1=Madhya, 2=Antya) - Pattern: 0,1,2,2,1,0 repeating
+# CORRECTED NADI (0=Adi, 1=Madhya, 2=Antya)
 NADI_TYPE = [
     0, 1, 2, 2, 1, 0, # 0-5
-    0, 1, 2, 2, 1, 0, # 6-11 (U.Phalguni is index 11 -> 0/Adi)
+    0, 1, 2, 2, 1, 0, # 6-11
     0, 1, 2, 2, 1, 0, # 12-17
     0, 1, 2, 2, 1, 0, # 18-23
-    0, 1, 2           # 24-26 (Revati is 26 -> 2/Antya)
+    0, 1, 2           # 24-26
 ]
 NADI_NAMES = ["Adi (Start)", "Madhya (Middle)", "Antya (End)"]
 
@@ -85,7 +85,7 @@ SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10]
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v63_accuracy_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v64_restored", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -235,15 +235,12 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
-    
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
-    
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
     else: verdict += "These periods complement each other well for growth."
-        
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -279,18 +276,12 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     # 3. Tara
     cnt_b_g = (g_nak - b_nak) % 27 + 1
     cnt_g_b = (b_nak - g_nak) % 27 + 1
-    
-    # Check 1: Boy to Girl
     t1_bad = cnt_b_g % 9 in [3, 5, 7]
-    # Check 2: Girl to Boy
     t2_bad = cnt_g_b % 9 in [3, 5, 7]
-    
     t_raw = 3
     if t1_bad and t2_bad: t_raw = 0
     elif t1_bad or t2_bad: t_raw = 1.5
-    
     t_final = t_raw; reason = "Benefic" if t_raw == 3 else ("Mixed" if t_raw == 1.5 else "Malefic")
-    
     if t_raw < 3 and friends: 
         t_final = 3; reason = "Boosted by Maitri"
         logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": "Maitri: Lords are friends.", "Source": "Muhurtha Martanda"})
@@ -310,17 +301,11 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     # 6. Gana
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
-    # Standard Rule: Deva(0)-Deva(0)=6, Manushya(1)-Manushya(1)=6, Rak(2)-Rak(2)=6
-    # Deva(0)-Manushya(1)=6, Manushya(1)-Deva(0)=6 (This matches your case)
-    # Deva(0)-Rak(2)=1, Rak(2)-Deva(0)=1
-    # Manushya(1)-Rak(2)=0, Rak(2)-Manushya(1)=0
-    
     ga_raw = 0
     if gb == gg: ga_raw = 6
     elif (gb==0 and gg==1) or (gb==1 and gg==0): ga_raw = 6
     elif (gb==0 and gg==2) or (gb==2 and gg==0): ga_raw = 1
     elif (gb==1 and gg==2) or (gb==2 and gg==1): ga_raw = 0
-    
     ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
     if ga_raw < 6 and friends: 
         ga_final = 6; reason = "Boosted by Maitri"
@@ -329,13 +314,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
     
     # 7. Bhakoot
     dist = (b_rashi-g_rashi)%12
-    # 7pts if dist is NOT 2, 6, 5, 9, 12... wait. Standard is 1/1(7), 1/7(7), 3/11(7), 4/10(7). 
-    # Bad are 2/12 (dwirdwadash), 5/9 (navpancham), 6/8 (shadashtak).
-    # Distance in positions: 0 (same), 1 (2nd), etc.
-    # Bad dists in 0-index: 1 (2/12), 11 (12/2), 4 (5/9), 8 (9/5), 5 (6/8), 7 (8/6)
-    # The 'd' variable is 0-indexed distance.
     bh_raw = 7 if dist not in [1, 11, 4, 8, 5, 7] else 0
-    
     bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
     if bh_raw == 0 and (friends or NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]): 
         bh_final = 7; reason = "Compensated by Maitri/Nadi"
@@ -375,10 +354,45 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi):
 
     return score, bd, logs, rajju_status, vedha_status
 
-# ... (Rest of Auto-Detect Model, UI, etc. same as before) ...
-# Copy everything from "AUTO-DETECT MODEL" downwards from the previous code block here.
-# To keep this message concise, assume the rest of the code is identical to v62.0.
-# Just ensuring the calculate_all function is the new one above.
+def format_chart_for_ai(chart_data):
+    if not chart_data: return "Chart not generated."
+    readable = []
+    for rashi_idx, planets in chart_data.items():
+        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+    return "; ".join(readable)
+
+def get_jupiter_position_for_year(year):
+    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
+    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
+
+def predict_marriage_luck_years(rashi_idx):
+    predictions = []
+    for year in [2025, 2026, 2027]:
+        jup_rashi = get_jupiter_position_for_year(year)
+        house = (jup_rashi - rashi_idx) % 12 + 1
+        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
+        predictions.append((year, res))
+    return predictions
+
+def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
+
+# RESTORED MISSING FUNCTION
+def find_best_matches(source_gender, s_nak, s_rashi):
+    matches = []
+    for i in range(27):
+        target_star_name = NAKSHATRAS[i]
+        valid_rashi_indices = NAK_TO_RASHI_MAP[i]
+        for r_idx in valid_rashi_indices:
+            target_rashi_name = RASHIS[r_idx]
+            if source_gender == "Boy": score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, r_idx)
+            else: score, bd, logs, _, _ = calculate_all(i, r_idx, s_nak, s_rashi)
+            raw_score = sum(item[1] for item in bd)
+            reason = logs[0]['Fix'] if logs else "Standard Match"
+            if score == 36: reason = "Perfect Match!"
+            matches.append({"Star": target_star_name, "Rashi": target_rashi_name, "Final Score": score, "Raw Score": raw_score, "Notes": reason})
+    return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
 # --- AUTO-DETECT MODEL ---
 def get_working_model(key):
