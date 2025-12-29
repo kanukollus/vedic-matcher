@@ -26,9 +26,23 @@ st.markdown("""
     .text-green { color: #00cc00 !important; }
     .text-orange { color: #ffa500 !important; }
     .text-red { color: #ff4b4b !important; }
-    .chart-container { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 60px); gap: 2px; background-color: #444; border: 2px solid #333; width: 100%; max-width: 350px; margin: auto; font-size: 10px; }
+    
+    /* CHART STYLING */
+    .chart-container { 
+        display: grid; 
+        grid-template-columns: repeat(4, 1fr); 
+        grid-template-rows: repeat(4, 60px); 
+        gap: 2px; 
+        background-color: #444; 
+        border: 2px solid #333; 
+        width: 100%; 
+        max-width: 300px; /* Reduced slightly to fit side-by-side better */
+        margin: 0 auto; 
+        font-size: 10px; 
+    }
     .chart-box { background-color: #fffbe6; color: #000; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold; padding: 2px; border: 1px solid #ccc; }
     .chart-center { grid-column: 2 / 4; grid-row: 2 / 4; background-color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; color: #555; }
+    
     .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 </style>
@@ -65,7 +79,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v71_complete", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v72_layout_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -275,7 +289,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     # 1. Varna
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
-    # Cancellation: Rashi Lords Friend OR Navamsa Lords Friend (or same)
     if v_raw == 0 and (friends or d9_friendly): 
         v_final = 1; reason = "Boosted by Maitri/Navamsa"
         logs.append({"Attribute": "Varna", "Problem": "Ego Conflict (0 pts)", "Fix": "Maitri or Inner Harmony (Navamsa) exists.", "Source": "Standard Vedic"})
@@ -291,7 +304,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va_raw = 0.5 
     va_final = va_raw; reason = "Magnetic" if va_raw >= 1 else "Mismatch"
-    # Cancellation: Friends OR D9 Friends OR Yoni Full
     if va_raw < 2 and (friends or d9_friendly or y_raw == 4): 
         va_final = 2; reason = "Boosted by Maitri/Navamsa/Yoni"
         logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch ({va_raw} pts)", "Fix": "Maitri/Navamsa or Yoni Perfect.", "Source": "Standard Vedic"})
@@ -306,7 +318,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     if t1_bad and t2_bad: t_raw = 0
     elif t1_bad or t2_bad: t_raw = 1.5
     t_final = t_raw; reason = "Benefic" if t_raw == 3 else ("Mixed" if t_raw == 1.5 else "Malefic")
-    # Cancellation: Friends OR D9 Friends
     if t_raw < 3 and (friends or d9_friendly): 
         t_final = 3; reason = "Boosted by Maitri"
         logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": "Maitri/Navamsa Lords are friends.", "Source": "Standard Vedic"})
@@ -322,7 +333,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     
     # 4. Yoni (Finalize)
     y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
-    # Cancellation: Friends OR D9 Friends OR Bhakoot Clean OR Vashya >= 1
     if y_raw < 4 and (friends or d9_friendly or bh_final == 7 or va_final >= 1): 
         y_final = 4; reason = "Compensated by Maitri/D9/Bhakoot/Vashya"
         logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": "Maitri/Navamsa/Bhakoot/Vashya OK.", "Source": "Standard Vedic"})
@@ -330,7 +340,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     
     # 5. Maitri
     m_final = maitri_raw
-    # Cancellation: D9 Friends OR Bhakoot Clean
     if maitri_raw < 5 and (d9_friendly or bh_final == 7):
         m_final = 5; reason = "Restored by D9/Bhakoot"
         logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": "Navamsa Friends or Bhakoot Clean.", "Source": "Standard Vedic"})
@@ -346,7 +355,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     elif (gb==0 and gg==2) or (gb==2 and gg==0): ga_raw = 1
     elif (gb==1 and gg==2) or (gb==2 and gg==1): ga_raw = 0
     ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
-    # Cancellation: Star Count >= 14 OR Friends OR D9 Friends OR Bhakoot Clean
     star_dist = (g_nak - b_nak) % 27 + 1
     if ga_raw < 6:
         if star_dist >= 14:
@@ -395,30 +403,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         vedha_status = "Fail"
 
     return score, bd, logs, rajju_status, vedha_status
-
-def format_chart_for_ai(chart_data):
-    if not chart_data: return "Chart not generated."
-    readable = []
-    for rashi_idx, planets in chart_data.items():
-        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
-    return "; ".join(readable)
-
-def get_jupiter_position_for_year(year):
-    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
-    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
-    ayanamsa = 23.85 + (year - 2000) * 0.01396
-    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
-
-def predict_marriage_luck_years(rashi_idx):
-    predictions = []
-    for year in [2025, 2026, 2027]:
-        jup_rashi = get_jupiter_position_for_year(year)
-        house = (jup_rashi - rashi_idx) % 12 + 1
-        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
-        predictions.append((year, res))
-    return predictions
-
-def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     matches = []
@@ -630,8 +614,9 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            st.markdown("### 🔮 Pro: Planetary Charts"); c_h1, c_h2 = st.columns(2)
-            with c_h1: 
+            st.markdown("### 🔮 Pro: Planetary Charts")
+            c1, c2 = st.columns(2)
+            with c1: 
                 st.markdown(render_south_indian_chart(res['b_planets'], "Boy Rashi (D1)"), unsafe_allow_html=True)
                 if res.get('b_d9'): st.markdown(render_south_indian_chart(res['b_d9'], "Boy Navamsa (D9)"), unsafe_allow_html=True)
             with c2: 
