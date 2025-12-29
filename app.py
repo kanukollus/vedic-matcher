@@ -119,10 +119,13 @@ def clean_text(text):
 def generate_pdf(res):
     pdf = PDFReport()
     pdf.add_page()
+    
+    # 1. Basics
     pdf.chapter_title(clean_text("1. Birth Details"))
     details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
     pdf.chapter_body(clean_text(details))
     
+    # 2. Verdict
     pdf.chapter_title(clean_text("2. The Verdict"))
     score_txt = f"Score: {res['score']} / 36"
     status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
@@ -131,11 +134,13 @@ def generate_pdf(res):
     pdf.set_font('Arial', '', 10)
     
     if st.session_state.ai_pitch:
-        pdf.ln(2); pdf.set_font('Arial', 'I', 10)
+        pdf.ln(2)
+        pdf.set_font('Arial', 'I', 10)
         pdf.multi_cell(0, 6, clean_text(f"AI Insight: {st.session_state.ai_pitch}"))
         pdf.set_font('Arial', '', 10)
     pdf.ln(5)
 
+    # 3. Guna Table
     pdf.chapter_title(clean_text("3. Guna Analysis & Logic"))
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(40, 7, clean_text("Attribute"), 1)
@@ -149,12 +154,14 @@ def generate_pdf(res):
         fix_txt = reason
         for log in res['logs']:
             if log['Attribute'] == attr: fix_txt = f"{reason} (Fix: {log['Fix']})"
+        
         pdf.cell(40, 7, clean_text(attr), 1)
         pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1)
         pdf.cell(120, 7, clean_text(fix_txt), 1)
         pdf.ln()
     pdf.ln(5)
 
+    # 4. Layman Analysis
     pdf.chapter_title(clean_text("4. Key Dosha Analysis (Layman Terms)"))
     r_stat = "Pass (Physical compatibility good)" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail (Physical incompatibility)"
     v_stat = "Pass (No energy blocks)" if res['vedha'] == "Pass" else "Fail (Energy obstruction)"
@@ -166,8 +173,11 @@ def generate_pdf(res):
     pdf.chapter_body(clean_text(f"Boy Mars: {bm}"))
     pdf.chapter_body(clean_text(f"Girl Mars: {gm}"))
     
+    # 5. Planetary Data
     if res.get('b_planets'):
-        pdf.add_page(); pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
+        pdf.add_page()
+        pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
+        
         def dict_to_str(chart):
             if not chart: return "N/A"
             lines = []
@@ -178,12 +188,14 @@ def generate_pdf(res):
 
         pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
         pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_planets']))); pdf.ln(3)
+        
         pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
         pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_planets']))); pdf.ln(3)
         
         if res.get('b_d9'):
             pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
             pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_d9']))); pdf.ln(3)
+            
             pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
             pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_d9']))); pdf.ln(3)
 
@@ -191,7 +203,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v81_reorder_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v82_pro", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -218,6 +230,40 @@ def calculate_d9_position(longitude):
     elif d1_rashi in [3, 7, 11]: start_sign = 3 
     return (start_sign + nav_num) % 12
 
+# === NEW: RAHU/KETU/ASCENDANT LOGIC ===
+def calculate_rahu_ketu_mean(jd):
+    # Mean Node of Moon (Rahu)
+    t = (jd - 2451545.0) / 36525.0
+    # Mean Longitude of the Ascending Node (Rahu)
+    omega = 125.04452 - 1934.136261 * t + 0.0020708 * t * t + t * t * t / 450000.0
+    rahu_long = omega % 360
+    ketu_long = (rahu_long + 180) % 360
+    return rahu_long, ketu_long
+
+def calculate_ascendant(observer, jd):
+    # Uses standard formula for Ascendant based on LST and Latitude
+    # 1. Get Local Sidereal Time (degrees)
+    lst_rad = float(observer.sidereal_time()) 
+    lat_rad = float(observer.lat)
+    
+    # 2. Obliquity of Ecliptic (approx 23.44 deg)
+    eps_rad = math.radians(23.4392911)
+    
+    # 3. Formula: tan(Asc) = y / x
+    # y = cos(LST)
+    # x = - ( sin(LST) * cos(eps) + tan(lat) * sin(eps) )
+    y = math.cos(lst_rad)
+    x = - (math.sin(lst_rad) * math.cos(eps_rad) + math.tan(lat_rad) * math.sin(eps_rad))
+    
+    asc_rad = math.atan2(y, x)
+    asc_deg = math.degrees(asc_rad)
+    
+    # Ayanamsa correction (Lahiri approx)
+    # Using simplistic linear approx for Ayanamsa: ~23.85 + rate * years_since_2000
+    # Or rely on what get_planetary_positions does.
+    # Note: observer.sidereal_time gives Tropical reference. We must subtract Ayanamsa.
+    return asc_deg % 360
+
 def get_d9_rashi_from_pada(nak_idx, pada):
     total_padas = (nak_idx * 4) + (pada - 1)
     return total_padas % 12
@@ -238,11 +284,17 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
         loc = get_cached_coords(city, country)
         if loc: obs.lat, obs.lon = str(loc.latitude), str(loc.longitude)
     
+    # Base bodies
     moon = ephem.Moon(); moon.compute(obs)
     mars = ephem.Mars(); mars.compute(obs)
     sun = ephem.Sun(); sun.compute(obs)
     
-    ayanamsa = 23.85 + (dt.year - 2000) * 0.01396
+    # Ayanamsa Calculation (Lahiri)
+    # t = (jd - 2451545.0) / 36525
+    jd = ephem.julian_date(obs.date)
+    t = (jd - 2451545.0) / 36525.0
+    ayanamsa = 23.85 + 1.4 * t # Simplified rate
+    
     s_moon = (math.degrees(ephem.Ecliptic(moon).lon) - ayanamsa) % 360
     s_mars = (math.degrees(ephem.Ecliptic(mars).lon) - ayanamsa) % 360
     s_sun = (math.degrees(ephem.Ecliptic(sun).lon) - ayanamsa) % 360
@@ -252,19 +304,60 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     
     if detailed:
         bodies = [ephem.Sun(), ephem.Moon(), ephem.Mars(), ephem.Mercury(), ephem.Jupiter(), ephem.Venus(), ephem.Saturn()]
-        names = ["Sun", "Moon", "Mars", "Merc", "Jup", "Ven", "Sat"]
+        names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"] # Short names for chart
+        
         d1_chart_data = {}
         d9_chart_data = {}
+        
+        # 1. Main Planets
         for body, name in zip(bodies, names):
             body.compute(obs)
             long = (math.degrees(ephem.Ecliptic(body).lon) - ayanamsa) % 360
+            
+            # D1
             r_idx_d1 = int(long / 30)
             if r_idx_d1 not in d1_chart_data: d1_chart_data[r_idx_d1] = []
             d1_chart_data[r_idx_d1].append(name)
             
+            # D9
             r_idx_d9 = calculate_d9_position(long)
             if r_idx_d9 not in d9_chart_data: d9_chart_data[r_idx_d9] = []
             d9_chart_data[r_idx_d9].append(name)
+            
+        # 2. Rahu & Ketu (Mean Node)
+        rahu_l, ketu_l = calculate_rahu_ketu_mean(jd)
+        rahu_sid = (rahu_l - ayanamsa) % 360
+        ketu_sid = (ketu_l - ayanamsa) % 360
+        
+        # Add Rahu
+        r_idx = int(rahu_sid / 30)
+        if r_idx not in d1_chart_data: d1_chart_data[r_idx] = []
+        d1_chart_data[r_idx].append("Ra")
+        r_d9 = calculate_d9_position(rahu_sid)
+        if r_d9 not in d9_chart_data: d9_chart_data[r_d9] = []
+        d9_chart_data[r_d9].append("Ra")
+        
+        # Add Ketu
+        k_idx = int(ketu_sid / 30)
+        if k_idx not in d1_chart_data: d1_chart_data[k_idx] = []
+        d1_chart_data[k_idx].append("Ke")
+        k_d9 = calculate_d9_position(ketu_sid)
+        if k_d9 not in d9_chart_data: d9_chart_data[k_d9] = []
+        d9_chart_data[k_d9].append("Ke")
+        
+        # 3. Ascendant (Lagna)
+        asc_trop = calculate_ascendant(obs, jd) # This returns tropical roughly from formula
+        # Actually standard formula with RAMC gives Tropical Ascendant.
+        # We must subtract ayanamsa.
+        asc_sid = (asc_trop - ayanamsa) % 360
+        
+        a_idx = int(asc_sid / 30)
+        if a_idx not in d1_chart_data: d1_chart_data[a_idx] = []
+        d1_chart_data[a_idx].append("Asc") # Lagna in D1
+        
+        a_d9 = calculate_d9_position(asc_sid)
+        if a_d9 not in d9_chart_data: d9_chart_data[a_d9] = []
+        d9_chart_data[a_d9].append("Asc") # Lagna in D9
 
     return s_moon, s_mars, s_sun, msg, d1_chart_data, d9_chart_data
 
@@ -281,9 +374,9 @@ def render_south_indian_chart(positions, title):
     grid_items = [""] * 16
     for rashi_idx, planets in positions.items():
         if rashi_idx in SOUTH_CHART_MAP:
-            short_planets = [p[:2] for p in planets]
+            # Use short names already in list
             grid_pos = SOUTH_CHART_MAP[rashi_idx]
-            grid_items[grid_pos] = "<br>".join(short_planets)
+            grid_items[grid_pos] = "<br>".join(planets)
     return f"""
     <div style="text-align: center; margin-bottom: 2px; font-size: 12px;"><strong>{title}</strong></div>
     <div class="chart-container">
@@ -338,24 +431,31 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
     if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
+    
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
-        if any(p in ["Sat", "Mars", "Rahu", "Ketu", "Sun"] for p in occupants):
+        if any(p in ["Sa", "Ma", "Ra", "Ke", "Su"] for p in occupants): # Updated short names
             observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity.")
-        elif any(p in ["Jup", "Ven", "Merc"] for p in occupants):
+        elif any(p in ["Ju", "Ve", "Me"] for p in occupants):
             observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony and affection.")
+            
     aspectors = []
     for r_idx, planets in chart_data.items():
         dist = (house_7_idx - r_idx) % 12 + 1 
         for p in planets:
-            if p in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p]: aspectors.append(p)
-            elif dist == 7: aspectors.append(p)
+            # Map Short names back to Keys for SPECIAL_ASPECTS
+            p_full = "Mars" if p == "Ma" else ("Jupiter" if p == "Ju" else ("Saturn" if p == "Sa" else ("Rahu" if p == "Ra" else ("Ketu" if p == "Ke" else p))))
+            
+            if p_full in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p_full]: aspectors.append(p_full)
+            elif dist == 7: aspectors.append(p_full)
+                
     if aspectors:
         aspectors = list(set(aspectors))
-        if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
+        if "Saturn" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
         if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds energy and passion, but arguments can get heated.")
-        if "Jup" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
+        if "Jupiter" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
+        
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
@@ -363,12 +463,15 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
+    
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
+    
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
     else: verdict += "These periods complement each other well for growth."
+        
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -390,7 +493,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
     score = 0; bd = []; logs = []
     
-    # 1. Varna
+    # 1. Varna (Muhurtha Chintamani)
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
     
@@ -408,7 +511,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     y_raw = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_final = y_raw 
     
-    # 2. Vashya
+    # 2. Vashya (Brihat Parashara)
     va_raw = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va_raw = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
@@ -426,7 +529,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": "Brihat Parashara"})
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
-    # 3. Tara
+    # 3. Tara (Muhurtha Martanda)
     cnt_b_g = (g_nak - b_nak) % 27 + 1
     cnt_g_b = (b_nak - g_nak) % 27 + 1
     t1_bad = cnt_b_g % 9 in [3, 5, 7]
@@ -475,7 +578,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": "Jataka Parijata"})
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
-    # 5. Maitri
+    # 5. Maitri (Brihat Parashara)
     m_final = maitri_raw
     fix_msg = None
     if maitri_raw < 5:
@@ -489,7 +592,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         reason = "Friendly" if m_final>=4 else "Enemy"
     score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, reason))
     
-    # 6. Gana
+    # 6. Gana (Peeyushadhara)
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga_raw = 0
     if gb == gg: ga_raw = 6
@@ -671,8 +774,7 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            # FIX: DEFAULT SELECTION FOR GIRL
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
@@ -695,12 +797,9 @@ with tabs[0]:
                     
                     b_d9_rashi = calculate_d9_position(b_moon)
                     g_d9_rashi = calculate_d9_position(g_moon)
-                    
                     b_planets, g_planets = b_chart, g_chart
-                    
                     b_mars_result = check_mars_dosha_smart(b_rashi, b_mars_l)
                     g_mars_result = check_mars_dosha_smart(g_rashi, g_mars_l)
-                    
                     if pro_mode:
                         b_dasha_name, b_dasha_tone = calculate_current_dasha(b_moon, b_date)
                         g_dasha_name, g_dasha_tone = calculate_current_dasha(g_moon, g_date)
