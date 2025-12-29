@@ -65,7 +65,7 @@ NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "S
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v70_d9_smart", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v71_complete", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -258,7 +258,6 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     else: verdict += "The planetary positions are largely neutral, leaving the relationship's success in your own hands."
     return verdict
 
-# --- CORE CALCULATION WITH NAVAMSA LOGIC ---
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=None):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
@@ -397,40 +396,53 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
     return score, bd, logs, rajju_status, vedha_status
 
+def format_chart_for_ai(chart_data):
+    if not chart_data: return "Chart not generated."
+    readable = []
+    for rashi_idx, planets in chart_data.items():
+        if planets: readable.append(f"{RASHIS[rashi_idx]}: {', '.join(planets)}")
+    return "; ".join(readable)
+
+def get_jupiter_position_for_year(year):
+    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
+    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
+    ayanamsa = 23.85 + (year - 2000) * 0.01396
+    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
+
+def predict_marriage_luck_years(rashi_idx):
+    predictions = []
+    for year in [2025, 2026, 2027]:
+        jup_rashi = get_jupiter_position_for_year(year)
+        house = (jup_rashi - rashi_idx) % 12 + 1
+        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
+        predictions.append((year, res))
+    return predictions
+
+def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
+
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     matches = []
-    # Calculate User's D9 Rashi once
     s_d9_rashi = get_d9_rashi_from_pada(s_nak, s_pada)
     
     for i in range(27): 
         target_star_name = NAKSHATRAS[i]
-        
-        # We must iterate target Padas (1-4) to find best fit
         best_score_for_star = -1
         best_details = {}
-        
         for t_pada in range(1, 5):
             valid_rashis = NAK_TO_RASHI_MAP[i]
-            
-            # Check all valid rashis for this star
             for t_rashi_idx in valid_rashis:
                 t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
-                
-                # Run Calc
                 if source_gender == "Boy": 
                     score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
                 else: 
                     score, bd, logs, _, _ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
-                
                 if score > best_score_for_star:
                     best_score_for_star = score
                     raw_score = sum(item[1] for item in bd)
                     reason = logs[0]['Fix'] if logs else "Standard Match"
                     if score == 36: reason = "Perfect Match!"
                     best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Score": score, "Raw Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
-        
         if best_details: matches.append(best_details)
-            
     return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
 
 # --- AUTO-DETECT MODEL ---
@@ -513,7 +525,6 @@ with tabs[0]:
                     b_nak, b_rashi, b_pada = get_nak_rashi_pada(b_moon)
                     g_nak, g_rashi, g_pada = get_nak_rashi_pada(g_moon)
                     
-                    # Auto Calculate D9 Rashi for Logic
                     b_d9_rashi = calculate_d9_position(b_moon)
                     g_d9_rashi = calculate_d9_position(g_moon)
                     
@@ -530,7 +541,6 @@ with tabs[0]:
                     g_nak = NAKSHATRAS.index(g_star); g_rashi = RASHIS.index(g_rashi_sel)
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
-                # PASS D9 DATA TO CALCULATION
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
                 
                 b_obs, g_obs = [], []
@@ -620,9 +630,8 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            st.markdown("### 🔮 Pro: Planetary Charts")
-            c1, c2 = st.columns(2)
-            with c1: 
+            st.markdown("### 🔮 Pro: Planetary Charts"); c_h1, c_h2 = st.columns(2)
+            with c_h1: 
                 st.markdown(render_south_indian_chart(res['b_planets'], "Boy Rashi (D1)"), unsafe_allow_html=True)
                 if res.get('b_d9'): st.markdown(render_south_indian_chart(res['b_d9'], "Boy Navamsa (D9)"), unsafe_allow_html=True)
             with c2: 
