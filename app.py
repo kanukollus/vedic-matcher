@@ -92,7 +92,7 @@ SYNERGY_MEANINGS = {
     "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths."
 }
 
-# --- PDF GENERATOR (FIXED ENCODING) ---
+# --- PDF GENERATOR ---
 class PDFReport(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
@@ -111,36 +111,18 @@ class PDFReport(FPDF):
         self.ln()
 
 def clean_text(text):
-    """Replaces emojis with text and strips unsupported characters for PDF."""
     if not isinstance(text, str): return str(text)
-    
-    # Specific Replacements
-    replacements = {
-        "✅": "[PASS] ",
-        "⚠️": "[WARN] ",
-        "❌": "[FAIL] ",
-        "🔥": "[HIGH ENERGY] ",
-        "✨": "* ",
-        "🔸": "> ",
-        "🔗": "",
-        "🤖": ""
-    }
-    for k, v in replacements.items():
-        text = text.replace(k, v)
-        
-    # Generic Clean: Encode to latin-1, replace errors with '?', then decode back
+    replacements = {"✅": "[PASS] ", "⚠️": "[WARN] ", "❌": "[FAIL] ", "🔥": "[HIGH ENERGY] ", "✨": "* ", "🔸": "> ", "🔗": "", "🤖": ""}
+    for k, v in replacements.items(): text = text.replace(k, v)
     return text.encode('latin-1', 'replace').decode('latin-1')
 
 def generate_pdf(res):
     pdf = PDFReport()
     pdf.add_page()
-    
-    # 1. Basics
     pdf.chapter_title(clean_text("1. Birth Details"))
     details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
     pdf.chapter_body(clean_text(details))
     
-    # 2. Verdict
     pdf.chapter_title(clean_text("2. The Verdict"))
     score_txt = f"Score: {res['score']} / 36"
     status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
@@ -149,14 +131,11 @@ def generate_pdf(res):
     pdf.set_font('Arial', '', 10)
     
     if st.session_state.ai_pitch:
-        pdf.ln(2)
-        pdf.set_font('Arial', 'I', 10)
-        # Clean the AI pitch too
+        pdf.ln(2); pdf.set_font('Arial', 'I', 10)
         pdf.multi_cell(0, 6, clean_text(f"AI Insight: {st.session_state.ai_pitch}"))
         pdf.set_font('Arial', '', 10)
     pdf.ln(5)
 
-    # 3. Guna Table
     pdf.chapter_title(clean_text("3. Guna Analysis & Logic"))
     pdf.set_font('Arial', 'B', 10)
     pdf.cell(40, 7, clean_text("Attribute"), 1)
@@ -169,16 +148,13 @@ def generate_pdf(res):
         attr, raw, final, mx, reason = item
         fix_txt = reason
         for log in res['logs']:
-            if log['Attribute'] == attr:
-                fix_txt = f"{reason} (Fix: {log['Fix']})"
-        
+            if log['Attribute'] == attr: fix_txt = f"{reason} (Fix: {log['Fix']})"
         pdf.cell(40, 7, clean_text(attr), 1)
         pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1)
         pdf.cell(120, 7, clean_text(fix_txt), 1)
         pdf.ln()
     pdf.ln(5)
 
-    # 4. Layman Analysis
     pdf.chapter_title(clean_text("4. Key Dosha Analysis (Layman Terms)"))
     r_stat = "Pass (Physical compatibility good)" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail (Physical incompatibility)"
     v_stat = "Pass (No energy blocks)" if res['vedha'] == "Pass" else "Fail (Energy obstruction)"
@@ -190,11 +166,8 @@ def generate_pdf(res):
     pdf.chapter_body(clean_text(f"Boy Mars: {bm}"))
     pdf.chapter_body(clean_text(f"Girl Mars: {gm}"))
     
-    # 5. Planetary Data
     if res.get('b_planets'):
-        pdf.add_page()
-        pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
-        
+        pdf.add_page(); pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
         def dict_to_str(chart):
             if not chart: return "N/A"
             lines = []
@@ -205,14 +178,12 @@ def generate_pdf(res):
 
         pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
         pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_planets']))); pdf.ln(3)
-        
         pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
         pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_planets']))); pdf.ln(3)
         
         if res.get('b_d9'):
             pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
             pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_d9']))); pdf.ln(3)
-            
             pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
             pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_d9']))); pdf.ln(3)
 
@@ -220,7 +191,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v80_pdf_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v81_reorder_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -367,7 +338,6 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
     if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
-    
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
@@ -375,20 +345,17 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
             observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity.")
         elif any(p in ["Jup", "Ven", "Merc"] for p in occupants):
             observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony and affection.")
-            
     aspectors = []
     for r_idx, planets in chart_data.items():
         dist = (house_7_idx - r_idx) % 12 + 1 
         for p in planets:
             if p in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p]: aspectors.append(p)
             elif dist == 7: aspectors.append(p)
-                
     if aspectors:
         aspectors = list(set(aspectors))
         if "Sat" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
         if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds energy and passion, but arguments can get heated.")
         if "Jup" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
-        
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
@@ -396,15 +363,12 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
-    
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
-    
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
     else: verdict += "These periods complement each other well for growth."
-        
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -426,7 +390,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
     score = 0; bd = []; logs = []
     
-    # 1. Varna (Muhurtha Chintamani)
+    # 1. Varna
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
     
@@ -444,7 +408,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     y_raw = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_final = y_raw 
     
-    # 2. Vashya (Brihat Parashara)
+    # 2. Vashya
     va_raw = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va_raw = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
@@ -462,7 +426,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": "Brihat Parashara"})
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
-    # 3. Tara (Muhurtha Martanda)
+    # 3. Tara
     cnt_b_g = (g_nak - b_nak) % 27 + 1
     cnt_g_b = (b_nak - g_nak) % 27 + 1
     t1_bad = cnt_b_g % 9 in [3, 5, 7]
@@ -482,7 +446,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": "Muhurtha Martanda"})
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
-    # 7. Bhakoot (Early Calc)
+    # 7. Bhakoot (MOVE UP - ORDER FIX)
     dist = (b_rashi-g_rashi)%12
     bh_raw = 7 if dist not in [1, 11, 4, 8, 5, 7] else 0
     bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
@@ -511,7 +475,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": "Jataka Parijata"})
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
-    # 5. Maitri (Brihat Parashara)
+    # 5. Maitri
     m_final = maitri_raw
     fix_msg = None
     if maitri_raw < 5:
@@ -525,7 +489,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         reason = "Friendly" if m_final>=4 else "Enemy"
     score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, reason))
     
-    # 6. Gana (Peeyushadhara)
+    # 6. Gana
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga_raw = 0
     if gb == gg: ga_raw = 6
@@ -547,10 +511,10 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": "Peeyushadhara"})
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
-    # 7. Bhakoot (Append)
+    # 7. Bhakoot (Append Score Now)
     score += bh_final; bd.append(("Bhakoot", bh_raw, bh_final, 7, "Love Flow" if bh_final == 7 else "Blocked"))
     
-    # 8. Nadi (Muhurtha Chintamani)
+    # 8. Nadi
     n_raw = 8; n_final = 8; n_reason = "Healthy"
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
         n_raw = 0; n_final = 0; n_reason = "Same Nadi (Dosha)"
