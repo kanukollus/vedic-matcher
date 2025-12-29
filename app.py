@@ -45,8 +45,6 @@ st.markdown("""
     
     .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
-    
-    .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -56,7 +54,6 @@ if "results" not in st.session_state: st.session_state.results = {}
 if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
 if "api_key" not in st.session_state: st.session_state.api_key = ""
-if "ai_pitch" not in st.session_state: st.session_state.ai_pitch = "" # Store Elevator Pitch
 
 # --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
@@ -80,9 +77,21 @@ SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10]
 SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
+# SYNERGY INTERPRETATIONS
+SYNERGY_MEANINGS = {
+    "Sun": "Aligned Egos. You shine in similar ways and understand each other's pride.",
+    "Moon": "Deep Empathy. You intuitively understand each other's moods and needs.",
+    "Mars": "Synced Energy. You share the same drive, passion, and fighting style.",
+    "Merc": "Intellectual Bond. You communicate effortlessly and think alike.",
+    "Jup": "Shared Values. You have the same moral compass and life philosophy.",
+    "Ven": "Romantic Sync. You share similar tastes in love, luxury, and aesthetics.",
+    "Sat": "Karmic Strength. You share a similar work ethic and approach to challenges.",
+    "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths."
+}
+
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v76_elevator_pitch", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v77_synergy", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -498,10 +507,8 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
 def get_shared_positions(b_chart, g_chart):
     shared = []
     if not b_chart or not g_chart: return []
-    
     b_pos = {}
     g_pos = {}
-    
     # Flatten charts
     for r_idx, planets in b_chart.items():
         for p in planets: b_pos[p] = r_idx
@@ -511,7 +518,8 @@ def get_shared_positions(b_chart, g_chart):
     for p in b_pos:
         if p in g_pos and b_pos[p] == g_pos[p]:
             r_name = RASHIS[b_pos[p]].split(" ")[0] 
-            shared.append(f"Both have **{p}** in **{r_name}**")
+            meaning = SYNERGY_MEANINGS.get(p, "Strong Connection")
+            shared.append(f"**Shared {p} ({r_name}):** {meaning}")
             
     return shared
 
@@ -571,8 +579,7 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            # FIX: DEFAULT SELECTION FOR GIRL
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
@@ -629,7 +636,6 @@ with tabs[0]:
                     "b_dasha": f"{b_dasha_name}", "g_dasha": f"{g_dasha_name}"
                 }
                 st.session_state.calculated = True
-                # Clear previous pitch
                 st.session_state.ai_pitch = ""
         except Exception as e: st.error(f"Error: {e}")
 
@@ -666,12 +672,10 @@ with tabs[0]:
         if res.get('b_planets') and res.get('g_planets'):
             st.markdown("### 🌌 Chart Synergy & Elevator Pitch")
             
-            # 1. Static Shared Positions (Free)
             shared_links = get_shared_positions(res['b_planets'], res['g_planets'])
             if shared_links:
                 st.info("🔗 **Cosmic Links Found:**\n" + "\n".join([f"- {s}" for s in shared_links]))
             
-            # 2. AI Elevator Pitch
             if st.session_state.ai_pitch:
                 st.markdown(f"""<div class="synergy-box"><strong>✨ Karmic Connection (AI Insight):</strong><br>{st.session_state.ai_pitch}</div>""", unsafe_allow_html=True)
             
@@ -716,7 +720,6 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
-            # ROW-BASED LAYOUT
             st.markdown("### 🔮 Pro: Planetary Charts")
             
             st.markdown("**1. Rashi Chakra (D1)**")
