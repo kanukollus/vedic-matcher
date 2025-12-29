@@ -28,6 +28,7 @@ st.markdown("""
     .text-orange { color: #ffa500 !important; }
     .text-red { color: #ff4b4b !important; }
     
+    /* CHART STYLING */
     .chart-container { 
         display: grid; 
         grid-template-columns: repeat(4, 1fr); 
@@ -127,10 +128,12 @@ def generate_pdf(res):
     
     # 2. Verdict
     pdf.chapter_title(clean_text("2. The Verdict"))
-    score_txt = f"Score: {res['score']} / 36"
-    status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
+    pdf.set_font('Arial', '', 12)
+    # PDF: Show both scores
+    pdf.cell(0, 8, clean_text(f"Raw Score: {res.get('raw_score', 0)} / 36"), 0, 1)
     pdf.set_font('Arial', 'B', 14)
-    pdf.cell(0, 10, clean_text(f"{score_txt} - {status}"), 0, 1)
+    status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
+    pdf.cell(0, 10, clean_text(f"Remedied Score: {res['score']} / 36 - {status}"), 0, 1)
     pdf.set_font('Arial', '', 10)
     
     if st.session_state.ai_pitch:
@@ -153,7 +156,8 @@ def generate_pdf(res):
         attr, raw, final, mx, reason = item
         fix_txt = reason
         for log in res['logs']:
-            if log['Attribute'] == attr: fix_txt = f"{reason} (Fix: {log['Fix']})"
+            if log['Attribute'] == attr:
+                fix_txt = f"{reason} (Fix: {log['Fix']})"
         
         pdf.cell(40, 7, clean_text(attr), 1)
         pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1)
@@ -774,7 +778,8 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
+            # FIX: DEFAULT SELECTION FOR GIRL
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
@@ -809,6 +814,8 @@ with tabs[0]:
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
+                # RAW SCORE CALC
+                raw_score = sum(row[1] for row in breakdown)
                 
                 b_obs, g_obs = [], []
                 if pro_mode and b_planets:
@@ -818,7 +825,7 @@ with tabs[0]:
                 human_verdict = generate_human_verdict(score, rajju, b_obs, g_obs, f"{b_dasha_name} ({b_dasha_tone})", f"{g_dasha_name} ({g_dasha_tone})")
 
                 st.session_state.results = {
-                    "score": score, "bd": breakdown, "logs": logs, 
+                    "score": score, "raw_score": raw_score, "bd": breakdown, "logs": logs, 
                     "b_n": NAKSHATRAS[b_nak], "g_n": NAKSHATRAS[g_nak],
                     "b_mars": b_mars_result, "g_mars": g_mars_result,
                     "rajju": rajju, "vedha": vedha,
@@ -840,12 +847,29 @@ with tabs[0]:
 
         c_s, c_g = st.columns([1,1])
         with c_s:
+            st.markdown(f"<h1 style='text-align: center; color: #888; margin:0;'>{res['raw_score']}</h1>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'>Raw Score</p>", unsafe_allow_html=True)
+            
             st.markdown(f"<h1 style='text-align: center; color: {score_color}; margin:0;'>{res['score']}</h1>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center;'>out of 36</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center;'>Remedied Score</p>", unsafe_allow_html=True)
+            
             status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
             st.markdown(f"<h3 style='text-align: center; color: {score_color};'>{status}</h3>", unsafe_allow_html=True)
         with c_g:
-            fig = go.Figure(go.Indicator(mode = "gauge", value = res['score'], gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}))
+            # DOUBLE GAUGE
+            fig = go.Figure()
+            fig.add_trace(go.Indicator(
+                mode = "gauge+number", value = res['raw_score'],
+                domain = {'x': [0, 0.45], 'y': [0, 1]},
+                title = {'text': "Raw"},
+                gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': "#cccccc"}}
+            ))
+            fig.add_trace(go.Indicator(
+                mode = "gauge+number", value = res['score'],
+                domain = {'x': [0.55, 1], 'y': [0, 1]},
+                title = {'text': "Remedied"},
+                gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}
+            ))
             fig.update_layout(height=150, margin=dict(l=10, r=10, t=20, b=20))
             st.plotly_chart(fig, use_container_width=True)
 
