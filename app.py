@@ -45,6 +45,8 @@ st.markdown("""
     
     .verdict-box { background-color: #e8f5e9; border: 1px solid #c8e6c9; padding: 20px; border-radius: 10px; margin-top: 20px; color: #1b5e20; }
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+    
+    .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,6 +56,7 @@ if "results" not in st.session_state: st.session_state.results = {}
 if "messages" not in st.session_state: st.session_state.messages = []
 if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth Details"
 if "api_key" not in st.session_state: st.session_state.api_key = ""
+if "ai_pitch" not in st.session_state: st.session_state.ai_pitch = ""
 
 # --- DATA ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
@@ -91,7 +94,7 @@ SYNERGY_MEANINGS = {
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v77_synergy", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v78_layman", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -174,8 +177,9 @@ def check_mars_dosha_smart(moon_rashi, mars_long):
     if house_diff in [2, 4, 7, 8, 12]:
         if mars_rashi == 0 or mars_rashi == 7: return False, f"✅ Balanced (Mars in Own Sign - House {house_diff})"
         elif mars_rashi == 9: return False, f"✅ Balanced (Mars Exalted - House {house_diff})"
-        return True, f"🔸 **Active Energy (House {house_diff}):** Mars is strong here. Requires alignment."
-    return False, "✨ Calm (Mars is well-placed)"
+        # LAYMAN TRANSLATION: "Active Energy" -> "High Intensity"
+        return True, f"🔥 **High Intensity (House {house_diff}):** Mars influences {('Longevity & Intimacy' if house_diff==8 else ('Marriage Partnership' if house_diff==7 else 'Family/Temper'))}. Brings deep passion but requires a strong partner."
+    return False, "✨ **Calm:** Mars is placed peacefully. No aggressive energy spikes."
 
 def render_south_indian_chart(positions, title):
     grid_items = [""] * 16
@@ -720,6 +724,7 @@ with tabs[0]:
             else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
+            # ROW-BASED LAYOUT
             st.markdown("### 🔮 Pro: Planetary Charts")
             
             st.markdown("**1. Rashi Chakra (D1)**")
@@ -753,11 +758,29 @@ with tabs[0]:
                 st.table(pd.DataFrame(res['logs']))
         
         with st.expander("🪐 Mars & Dosha Analysis"):
-            st.write(f"**Rajju:** {res['rajju']} (Body Check)"); st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
-            # Fix Display Tuple Bug
+            # LAYMAN TRANSLATION FOR DOSHAS
+            r_stat = "✅ **Pass:** Physical & biological compatibility is good." if res['rajju'] == "Pass" or res['rajju'] == "Cancelled" else "⚠️ **Fail:** Potential physical incompatibility."
+            v_stat = "✅ **Pass:** No energetic blocks." if res['vedha'] == "Pass" else "⚠️ **Fail:** Energies naturally obstruct each other."
+            st.markdown(f"**Rajju (Body):** {r_stat}")
+            st.markdown(f"**Vedha (Obstruction):** {v_stat}")
+            st.markdown("---")
+            # MARS ANALYSIS
             bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
-            st.write(f"**Boy Mars:** {bm}"); st.write(f"**Girl Mars:** {gm}")
+            
+            # Compare Mars Logic
+            b_is_dosha = res['b_mars'][0] if isinstance(res['b_mars'], tuple) else False
+            g_is_dosha = res['g_mars'][0] if isinstance(res['g_mars'], tuple) else False
+            
+            if b_is_dosha and g_is_dosha:
+                st.success("🔥➕🔥 **Perfect Match:** Both have high energy (Manglik). Your intensities match perfectly.")
+            elif not b_is_dosha and not g_is_dosha:
+                st.success("✨➕✨ **Calm Match:** Both have peaceful Mars placements. A gentle relationship.")
+            else:
+                st.warning("🔥⚡✨ **Energy Mismatch:** One is High Intensity, one is Calm. This often requires active adjustment.")
+                
+            st.caption(f"Boy: {bm}")
+            st.caption(f"Girl: {gm}")
 
 # --- OTHER TABS ---
 with tabs[1]:
