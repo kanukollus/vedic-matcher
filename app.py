@@ -11,10 +11,10 @@ import google.generativeai as genai
 import time
 from fpdf import FPDF
 
-# --- PAGE CONFIG ---
+# --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="wide")
 
-# --- CSS STYLING ---
+# --- 2. CSS STYLING ---
 st.markdown("""
 <style>
     .guna-card { background-color: #f0f2f6; color: #31333F; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #ccc; }
@@ -61,7 +61,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE ---
+# --- 3. SESSION STATE ---
 if "calculated" not in st.session_state: st.session_state.calculated = False
 if "results" not in st.session_state: st.session_state.results = {}
 if "messages" not in st.session_state: st.session_state.messages = []
@@ -69,7 +69,7 @@ if "input_mode" not in st.session_state: st.session_state.input_mode = "Birth De
 if "api_key" not in st.session_state: st.session_state.api_key = ""
 if "ai_pitch" not in st.session_state: st.session_state.ai_pitch = ""
 
-# --- DATA ---
+# --- 4. DATA CONSTANTS ---
 NAKSHATRAS = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra","Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni","Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha","Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta","Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 RASHIS = ["Aries (Mesha)", "Taurus (Vrishabha)", "Gemini (Mithuna)", "Cancer (Karka)","Leo (Simha)", "Virgo (Kanya)", "Libra (Tula)", "Scorpio (Vrishchika)","Sagittarius (Dhanu)", "Capricorn (Makara)", "Aquarius (Kumbha)", "Pisces (Meena)"]
 SOUTH_CHART_MAP = {11: 0, 0: 1, 1: 2, 2: 3, 10: 4, 3: 7, 9: 8, 4: 11, 8: 12, 7: 13, 6: 14, 5: 15}
@@ -90,8 +90,6 @@ DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
 SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
-
-# SYNERGY INTERPRETATIONS (Use Full Names as Keys)
 SYNERGY_MEANINGS = {
     "Sun": "Aligned Egos. You shine in similar ways and understand each other's pride.",
     "Moon": "Deep Empathy. You intuitively understand each other's moods and needs.",
@@ -104,7 +102,8 @@ SYNERGY_MEANINGS = {
     "Ketu": "Past Life Bond. A deep, spiritual sense of knowing each other from before."
 }
 
-# --- HELPER FUNCTIONS ---
+# --- 5. HELPER FUNCTIONS (ALL DEFINED BEFORE UI) ---
+
 def clean_text(text):
     if not isinstance(text, str): return str(text)
     replacements = {"✅": "[PASS] ", "⚠️": "[WARN] ", "❌": "[FAIL] ", "🔥": "[HIGH ENERGY] ", "✨": "* ", "🔸": "> ", "🔗": "", "🤖": ""}
@@ -153,19 +152,17 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- PDF GENERATOR ---
+# --- PDF CLASS ---
 class PDFReport(FPDF):
     def header(self):
         self.set_font('Arial', 'B', 16)
         self.cell(0, 10, 'Vedic Matcher Pro - Compatibility Report', 0, 1, 'C')
         self.ln(5)
-
     def chapter_title(self, title):
         self.set_font('Arial', 'B', 12)
         self.set_fill_color(240, 242, 246)
         self.cell(0, 10, title, 0, 1, 'L', 1)
         self.ln(2)
-
     def chapter_body(self, body):
         self.set_font('Arial', '', 10)
         self.multi_cell(0, 6, body)
@@ -174,13 +171,9 @@ class PDFReport(FPDF):
 def generate_pdf(res):
     pdf = PDFReport()
     pdf.add_page()
-    
-    # 1. Basics
     pdf.chapter_title(clean_text("1. Birth Details"))
     details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
     pdf.chapter_body(clean_text(details))
-    
-    # 2. Verdict
     pdf.chapter_title(clean_text("2. The Verdict"))
     pdf.set_font('Arial', '', 12)
     pdf.cell(0, 8, clean_text(f"Base Score: {res.get('raw_score', 0)} / 36"), 0, 1)
@@ -188,78 +181,37 @@ def generate_pdf(res):
     status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
     pdf.cell(0, 10, clean_text(f"The Final Remedied Score: {res['score']} / 36 - {status}"), 0, 1)
     pdf.set_font('Arial', '', 10)
-    
     if st.session_state.ai_pitch:
-        pdf.ln(2)
-        pdf.set_font('Arial', 'I', 10)
+        pdf.ln(2); pdf.set_font('Arial', 'I', 10)
         pdf.multi_cell(0, 6, clean_text(f"AI Insight: {st.session_state.ai_pitch}"))
         pdf.set_font('Arial', '', 10)
     pdf.ln(5)
-
-    # 3. Guna Table
     pdf.chapter_title(clean_text("3. Guna Analysis & Logic"))
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(40, 7, clean_text("Attribute"), 1)
-    pdf.cell(30, 7, clean_text("Score"), 1)
-    pdf.cell(120, 7, clean_text("Reason / Fix"), 1)
-    pdf.ln()
+    pdf.cell(40, 7, clean_text("Attribute"), 1); pdf.cell(30, 7, clean_text("Score"), 1); pdf.cell(120, 7, clean_text("Reason / Fix"), 1); pdf.ln()
     pdf.set_font('Arial', '', 10)
-    
     for item in res['bd']:
         attr, raw, final, mx, reason = item
         fix_txt = reason
         for log in res['logs']:
-            if log['Attribute'] == attr:
-                fix_txt = f"{reason} (Fix: {log['Fix']})"
-        
-        pdf.cell(40, 7, clean_text(attr), 1)
-        pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1)
-        pdf.cell(120, 7, clean_text(fix_txt), 1)
-        pdf.ln()
+            if log['Attribute'] == attr: fix_txt = f"{reason} (Fix: {log['Fix']})"
+        pdf.cell(40, 7, clean_text(attr), 1); pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1); pdf.cell(120, 7, clean_text(fix_txt), 1); pdf.ln()
     pdf.ln(5)
-
-    # 4. Layman Analysis
-    pdf.chapter_title(clean_text("4. Key Dosha Analysis (Layman Terms)"))
-    r_stat = "Pass (Physical compatibility good)" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail (Physical incompatibility)"
-    v_stat = "Pass (No energy blocks)" if res['vedha'] == "Pass" else "Fail (Energy obstruction)"
-    pdf.chapter_body(clean_text(f"Rajju (Body): {r_stat}"))
-    pdf.chapter_body(clean_text(f"Vedha (Obstruction): {v_stat}"))
-    
-    bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
-    gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
-    pdf.chapter_body(clean_text(f"Boy Mars: {bm}"))
-    pdf.chapter_body(clean_text(f"Girl Mars: {gm}"))
-    
-    # 5. Planetary Data
+    pdf.chapter_title(clean_text("4. Key Dosha Analysis"))
+    r_stat = "Pass" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail"
+    v_stat = "Pass" if res['vedha'] == "Pass" else "Fail"
+    pdf.chapter_body(clean_text(f"Rajju: {r_stat} | Vedha: {v_stat}"))
     if res.get('b_planets'):
-        pdf.add_page()
-        pdf.chapter_title(clean_text("5. Planetary Positions (Detailed)"))
-        
-        def dict_to_str(chart):
+        pdf.add_page(); pdf.chapter_title(clean_text("5. Planetary Positions"))
+        def dts(chart):
             if not chart: return "N/A"
-            lines = []
-            for r_idx, planets in chart.items():
-                r_name = RASHIS[r_idx].split(' ')[0]
-                lines.append(f"{r_name}: {', '.join(planets)}")
-            return "\n".join(lines)
-
-        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
-        pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_planets']))); pdf.ln(3)
-        
-        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Rashi (D1):"), 0, 1); pdf.set_font('Arial', '', 10)
-        pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_planets']))); pdf.ln(3)
-        
-        if res.get('b_d9'):
-            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
-            pdf.multi_cell(0, 6, clean_text(dict_to_str(res['b_d9']))); pdf.ln(3)
-            
-            pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl's Navamsa (D9):"), 0, 1); pdf.set_font('Arial', '', 10)
-            pdf.multi_cell(0, 6, clean_text(dict_to_str(res['g_d9']))); pdf.ln(3)
-
+            return "\n".join([f"{RASHIS[r].split(' ')[0]}: {', '.join(p)}" for r, p in chart.items()])
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy D1:"), 0, 1); pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 6, clean_text(dts(res['b_planets']))); pdf.ln(3)
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl D1:"), 0, 1); pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 6, clean_text(dts(res['g_planets']))); pdf.ln(3)
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v92_final_clean", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v93_fix_crash", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -645,27 +597,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
     return score, bd, logs, rajju_status, vedha_status
 
-def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
-    matches = []
-    s_d9_rashi = get_d9_rashi_from_pada(s_nak, s_pada)
-    for i in range(27): 
-        target_star_name = NAKSHATRAS[i]
-        best_score_for_star = -1
-        best_details = {}
-        for t_pada in range(1, 5):
-            valid_rashis = NAK_TO_RASHI_MAP[i]
-            for t_rashi_idx in valid_rashis:
-                t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
-                if source_gender == "Boy": score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
-                else: score, bd, logs, _, _ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
-                if score > best_score_for_star:
-                    best_score_for_star = score; raw_score = sum(item[1] for item in bd)
-                    reason = logs[0]['Fix'] if logs else "Standard Match"
-                    if score == 36: reason = "Perfect Match!"
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Score": score, "Remedied Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
-        if best_details: matches.append(best_details)
-    return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
-
 # --- AUTO-DETECT MODEL ---
 def get_working_model(key):
     genai.configure(api_key=key)
@@ -721,7 +652,8 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
+            # FIX: DEFAULT SELECTION FOR GIRL
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
@@ -756,6 +688,7 @@ with tabs[0]:
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
+                # RAW SCORE CALC
                 raw_score = sum(row[1] for row in breakdown)
                 
                 b_obs, g_obs = [], []
@@ -855,28 +788,6 @@ with tabs[0]:
                         st.rerun()
             else:
                 st.caption("🔒 *Add API Key in 'Guru AI' tab to unlock the detailed spiritual elevator pitch.*")
-
-        with st.expander("🧠 Show me how I concluded this"):
-            st.markdown("### 1. 🤔 Thinking (Analyzing Foundation)")
-            st.write(f"I started by calculating the raw Ashta Koota compatibility. The base score was {res['score']}/36.")
-            
-            st.markdown("### 2. ⚙️ Harnessing (Applying Ancient Rules)")
-            if res['logs']:
-                st.write(f"I applied **Dosha Bhanga** (cancellation rules) to refine the score. See the 'Applied Remedies' table above.")
-            else: st.write("No special cancellation rules were needed.")
-            
-            st.markdown("### 3. ⏱️ Timing (Dasha Sandhi)")
-            if "Unknown" not in res['b_dasha']:
-                st.write(f"I checked the current Time Cycles (Vimshottari Dasha):")
-                st.caption(f"**Boy:** Running {res['b_dasha']}"); st.caption(f"**Girl:** Running {res['g_dasha']}")
-            else: st.write("Timing analysis skipped (Basic Mode).")
-            
-            st.markdown("### 4. 🧵 Stitching (Planetary Context)")
-            if res['b_obs'] or res['g_obs']:
-                st.write("I analyzed the **Chandra Kundali** for 7th House Aspects (Drishti) & Occupation:")
-                if res['b_obs']: st.caption(f"**Boy:** {'; '.join(res['b_obs'])}")
-                if res['g_obs']: st.caption(f"**Girl:** {'; '.join(res['g_obs'])}")
-            else: st.write("Planetary chart analysis skipped or neutral.")
 
         if res.get('b_planets') and res.get('g_planets'):
             st.markdown("### 🔮 Pro: Planetary Charts")
