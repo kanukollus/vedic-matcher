@@ -48,10 +48,6 @@ st.markdown("""
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
     
     .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
-    
-    /* CUSTOM METRIC STYLE */
-    .big-score { font-size: 48px; font-weight: bold; text-align: center; margin: 0; line-height: 1; }
-    .score-label { font-size: 14px; color: #666; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -210,7 +206,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v86_final_layout", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v87_layout_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -283,7 +279,7 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     # t = (jd - 2451545.0) / 36525
     jd = ephem.julian_date(obs.date)
     t = (jd - 2451545.0) / 36525.0
-    ayanamsa = 23.85 + 1.4 * t # Simplified rate
+    ayanamsa = 23.85 + 1.4 * t 
     
     s_moon = (math.degrees(ephem.Ecliptic(moon).lon) - ayanamsa) % 360
     s_mars = (math.degrees(ephem.Ecliptic(mars).lon) - ayanamsa) % 360
@@ -294,40 +290,26 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     
     if detailed:
         bodies = [ephem.Sun(), ephem.Moon(), ephem.Mars(), ephem.Mercury(), ephem.Jupiter(), ephem.Venus(), ephem.Saturn()]
-        names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"] # Short names for chart
-        
-        d1_chart_data = {}
-        d9_chart_data = {}
-        
-        # 1. Main Planets
+        names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"] 
+        d1_chart_data = {}; d9_chart_data = {}
         for body, name in zip(bodies, names):
             body.compute(obs)
             long = (math.degrees(ephem.Ecliptic(body).lon) - ayanamsa) % 360
-            
-            # D1
             r_idx_d1 = int(long / 30)
             if r_idx_d1 not in d1_chart_data: d1_chart_data[r_idx_d1] = []
             d1_chart_data[r_idx_d1].append(name)
-            
-            # D9
             r_idx_d9 = calculate_d9_position(long)
             if r_idx_d9 not in d9_chart_data: d9_chart_data[r_idx_d9] = []
             d9_chart_data[r_idx_d9].append(name)
             
-        # 2. Rahu & Ketu (Mean Node)
         rahu_l, ketu_l = calculate_rahu_ketu_mean(jd)
-        rahu_sid = (rahu_l - ayanamsa) % 360
-        ketu_sid = (ketu_l - ayanamsa) % 360
-        
-        # Add Rahu
+        rahu_sid = (rahu_l - ayanamsa) % 360; ketu_sid = (ketu_l - ayanamsa) % 360
         r_idx = int(rahu_sid / 30)
         if r_idx not in d1_chart_data: d1_chart_data[r_idx] = []
         d1_chart_data[r_idx].append("Ra")
         r_d9 = calculate_d9_position(rahu_sid)
         if r_d9 not in d9_chart_data: d9_chart_data[r_d9] = []
         d9_chart_data[r_d9].append("Ra")
-        
-        # Add Ketu
         k_idx = int(ketu_sid / 30)
         if k_idx not in d1_chart_data: d1_chart_data[k_idx] = []
         d1_chart_data[k_idx].append("Ke")
@@ -335,19 +317,14 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
         if k_d9 not in d9_chart_data: d9_chart_data[k_d9] = []
         d9_chart_data[k_d9].append("Ke")
         
-        # 3. Ascendant (Lagna)
-        asc_trop = calculate_ascendant(obs, jd) # This returns tropical roughly from formula
-        # Actually standard formula with RAMC gives Tropical Ascendant.
-        # We must subtract ayanamsa.
+        asc_trop = calculate_ascendant(obs, jd)
         asc_sid = (asc_trop - ayanamsa) % 360
-        
         a_idx = int(asc_sid / 30)
         if a_idx not in d1_chart_data: d1_chart_data[a_idx] = []
-        d1_chart_data[a_idx].append("Asc") # Lagna in D1
-        
+        d1_chart_data[a_idx].append("Asc")
         a_d9 = calculate_d9_position(asc_sid)
         if a_d9 not in d9_chart_data: d9_chart_data[a_d9] = []
-        d9_chart_data[a_d9].append("Asc") # Lagna in D9
+        d9_chart_data[a_d9].append("Asc")
 
     return s_moon, s_mars, s_sun, msg, d1_chart_data, d9_chart_data
 
@@ -364,7 +341,6 @@ def render_south_indian_chart(positions, title):
     grid_items = [""] * 16
     for rashi_idx, planets in positions.items():
         if rashi_idx in SOUTH_CHART_MAP:
-            # Use short names already in list
             grid_pos = SOUTH_CHART_MAP[rashi_idx]
             grid_items[grid_pos] = "<br>".join(planets)
     return f"""
@@ -808,7 +784,7 @@ with tabs[0]:
         if score_val >= 25: score_color = "#00cc00"
 
         # ROW 1: BASE GAUGE | REMEDIED GAUGE (Title on Top)
-        c1, c2, c3 = st.columns([1, 1, 1])
+        c1, c2 = st.columns([1, 1])
         
         with c1:
              fig_base = go.Figure(go.Indicator(
@@ -816,7 +792,7 @@ with tabs[0]:
                 title = {'text': "Base Score", 'font': {'size': 20, 'color': "#888"}},
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': "#cccccc"}}
             ))
-             fig_base.update_layout(height=180, margin=dict(l=10, r=10, t=40, b=10))
+             fig_base.update_layout(height=180, margin=dict(l=20, r=20, t=40, b=20))
              st.plotly_chart(fig_base, use_container_width=True)
 
         with c2:
@@ -825,17 +801,16 @@ with tabs[0]:
                 title = {'text': "The Final Remedied Score", 'font': {'size': 20, 'color': score_color}},
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}
             ))
-             fig_rem.update_layout(height=180, margin=dict(l=10, r=10, t=40, b=10))
+             fig_rem.update_layout(height=180, margin=dict(l=20, r=20, t=40, b=20))
              st.plotly_chart(fig_rem, use_container_width=True)
 
-        with c3:
-            # ROW 2 MOVED UP TO RIGHT COLUMN
-            st.markdown("##### 🛡️ Applied Remedies (Dosha Bhanga)")
-            if res['logs']:
-                df_remedies = pd.DataFrame(res['logs'])
-                st.dataframe(df_remedies, hide_index=True, use_container_width=True, height=150)
-            else:
-                st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
+        # ROW 2: APPLIED REMEDIES TABLE (Full Width)
+        st.markdown("##### 🛡️ Applied Remedies (Dosha Bhanga)")
+        if res['logs']:
+            df_remedies = pd.DataFrame(res['logs'])
+            st.dataframe(df_remedies, hide_index=True, use_container_width=True)
+        else:
+            st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
 
         # ROW 3: VERDICT BANNER (Smaller Font)
         status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
