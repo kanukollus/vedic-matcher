@@ -105,18 +105,6 @@ SYNERGY_MEANINGS = {
     "Ketu": "Past Life Bond. A deep, spiritual sense of knowing each other from before."
 }
 
-# --- SOURCE LINKS ---
-SOURCE_URLS = {
-    "Muhurtha Chintamani": "https://archive.org/details/MuhurtaChintamani",
-    "Brihat Parashara": "https://archive.org/details/BrihatParasharaHoraSastra",
-    "Jataka Parijata": "https://archive.org/details/JatakaParijata",
-    "Muhurtha Martanda": "https://archive.org/details/MuhurtaMartanda",
-    "Peeyushadhara": "https://www.google.com/search?q=Peeyushadhara+Muhurtha",
-    "Brihat Samhita": "https://archive.org/details/BrihatSamhita",
-    "Kala Vidhana": "https://www.google.com/search?q=Kala+Vidhana+Astrology",
-    "Classical List": "https://en.wikipedia.org/wiki/Nakshatra"
-}
-
 # --- 5. HELPER FUNCTIONS ---
 
 def clean_text(text):
@@ -226,7 +214,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v96_final_fixes", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v97_rollback_link", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -486,7 +474,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
     if fix_msg:
         v_final = 1; reason = "Boosted by Support"
-        logs.append({"Attribute": "Varna", "Problem": "Ego Conflict", "Fix": fix_msg, "Source": SOURCE_URLS["Muhurtha Chintamani"]})
+        logs.append({"Attribute": "Varna", "Problem": "Ego Conflict", "Fix": fix_msg, "Source": "Muhurtha Chintamani"})
     score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
     # 4. Yoni
@@ -506,7 +494,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
     if fix_msg: 
         va_final = 2; reason = "Boosted by Support"
-        logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": SOURCE_URLS["Brihat Parashara"]})
+        logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": "Brihat Parashara"})
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
     # 3. Tara
@@ -524,7 +512,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
     if fix_msg: 
         t_final = 3; reason = "Boosted by Support"
-        logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": SOURCE_URLS["Muhurtha Martanda"]})
+        logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": "Muhurtha Martanda"})
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
     # 7. Bhakoot
@@ -537,7 +525,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]: fix_msg = "Nadi is Different (Healthy)"
     if fix_msg: 
         bh_final = 7; reason = "Compensated"
-        logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": fix_msg, "Source": SOURCE_URLS["Brihat Samhita"]})
+        logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": fix_msg, "Source": "Brihat Samhita"})
     
     # 4. Yoni Final
     y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
@@ -549,7 +537,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif va_final >= 1: fix_msg = "Vashya is Magnetic"
     if fix_msg: 
         y_final = 4; reason = "Compensated"
-        logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": SOURCE_URLS["Jataka Parijata"]})
+        logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": "Jataka Parijata"})
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
     # 5. Maitri
@@ -560,7 +548,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
     if fix_msg:
         m_final = 5; reason = "Restored"
-        logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": fix_msg, "Source": SOURCE_URLS["Brihat Parashara"]})
+        logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": fix_msg, "Source": "Brihat Parashara"})
     else:
         reason = "Friendly" if m_final>=4 else "Enemy"
     score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, reason))
@@ -587,7 +575,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
     if fix_msg:
         ga_final = 6; reason = "Boosted"
-        logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": SOURCE_URLS["Peeyushadhara"]})
+        logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": "Peeyushadhara"})
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
     # 7. Bhakoot Final
@@ -600,13 +588,13 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         problem = f"{NADI_NAMES[NADI_TYPE[b_nak]]} vs {NADI_NAMES[NADI_TYPE[g_nak]]}"
         if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: 
             n_final=8; n_reason="Exception: Allowed Star"
-            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": f"Star {NAKSHATRAS[b_nak]} is an Exception.", "Source": SOURCE_URLS["Classical List"]})
+            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": f"Star {NAKSHATRAS[b_nak]} is an Exception.", "Source": "Classical List"})
         elif b_rashi==g_rashi and b_nak!=g_nak: 
             n_final=8; n_reason="Exception: Same Rashi"
-            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Same Rashi, Different Star.", "Source": SOURCE_URLS["Muhurtha Martanda"]})
+            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Same Rashi, Different Star.", "Source": "Muhurtha Martanda"})
         elif friends: 
             n_final=8; n_reason="Cancelled: Strong Maitri"
-            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Maitri overrides Nadi.", "Source": SOURCE_URLS["Muhurtha Chintamani"]})
+            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Maitri overrides Nadi.", "Source": "Muhurtha Chintamani"})
     score += n_final; bd.append(("Nadi", n_raw, n_final, 8, n_reason))
 
     # South Indian
@@ -617,7 +605,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         rajju_status = "Fail"
         if friends or b_rashi == g_rashi: 
             rajju_status = "Cancelled"
-            logs.append({"Attribute": "Rajju", "Problem": "Body Part Clash", "Fix": "Maitri overrides Rajju.", "Source": SOURCE_URLS["Kala Vidhana"]})
+            logs.append({"Attribute": "Rajju", "Problem": "Body Part Clash", "Fix": "Maitri overrides Rajju.", "Source": "Kala Vidhana"})
     
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
@@ -789,8 +777,7 @@ with tabs[0]:
         st.markdown("##### 🛡️ Applied Remedies (Dosha Bhanga)")
         if res['logs']:
             df_remedies = pd.DataFrame(res['logs'])
-            st.dataframe(df_remedies, hide_index=True, use_container_width=True,
-                         column_config={"Source": st.column_config.LinkColumn(display_text="Open Source")})
+            st.dataframe(df_remedies, hide_index=True, use_container_width=True)
         else:
             st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
 
