@@ -85,10 +85,14 @@ VASHYA_GROUP = [0, 0, 1, 2, 1, 1, 1, 3, 1, 2, 1, 2]
 YONI_ID = [0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9, 8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1]
 YONI_Enemy_Map = {0:8, 1:13, 2:11, 3:12, 4:10, 5:6, 6:5, 7:9, 8:0, 9:7, 10:4, 11:2, 12:3, 13:1}
 RASHI_LORDS = [2, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] 
+# 0:Sun, 1:Moon, 2:Mars, 3:Merc, 4:Jup, 5:Ven, 6:Sat
+PLANET_NAMES_MAP = {0: "Sun", 1: "Moon", 2: "Mars", 3: "Mercury", 4: "Jupiter", 5: "Venus", 6: "Saturn"}
+
 DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
 SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
+NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 SYNERGY_MEANINGS = {
     "Sun": "Aligned Egos. You shine in similar ways and understand each other's pride.",
     "Moon": "Deep Empathy. You intuitively understand each other's moods and needs.",
@@ -99,6 +103,18 @@ SYNERGY_MEANINGS = {
     "Saturn": "Karmic Strength. You share a similar work ethic and approach to challenges.",
     "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths.",
     "Ketu": "Past Life Bond. A deep, spiritual sense of knowing each other from before."
+}
+
+# --- SOURCE LINKS ---
+SOURCE_URLS = {
+    "Muhurtha Chintamani": "https://archive.org/details/MuhurtaChintamani",
+    "Brihat Parashara": "https://archive.org/details/BrihatParasharaHoraSastra",
+    "Jataka Parijata": "https://archive.org/details/JatakaParijata",
+    "Muhurtha Martanda": "https://archive.org/details/MuhurtaMartanda",
+    "Peeyushadhara": "https://www.google.com/search?q=Peeyushadhara+Muhurtha",
+    "Brihat Samhita": "https://archive.org/details/BrihatSamhita",
+    "Kala Vidhana": "https://www.google.com/search?q=Kala+Vidhana+Astrology",
+    "Classical List": "https://en.wikipedia.org/wiki/Nakshatra"
 }
 
 # --- 5. HELPER FUNCTIONS ---
@@ -151,10 +167,66 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
-# --- 6. CORE CALCULATORS ---
+# --- PDF GENERATOR ---
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'Vedic Matcher Pro - Compatibility Report', 0, 1, 'C')
+        self.ln(5)
+    def chapter_title(self, title):
+        self.set_font('Arial', 'B', 12)
+        self.set_fill_color(240, 242, 246)
+        self.cell(0, 10, title, 0, 1, 'L', 1)
+        self.ln(2)
+    def chapter_body(self, body):
+        self.set_font('Arial', '', 10)
+        self.multi_cell(0, 6, body)
+        self.ln()
+
+def generate_pdf(res):
+    pdf = PDFReport()
+    pdf.add_page()
+    pdf.chapter_title(clean_text("1. Birth Details"))
+    details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
+    pdf.chapter_body(clean_text(details))
+    pdf.chapter_title(clean_text("2. The Verdict"))
+    pdf.set_font('Arial', '', 12)
+    pdf.cell(0, 8, clean_text(f"Base Score: {res.get('raw_score', 0)} / 36"), 0, 1)
+    pdf.set_font('Arial', 'B', 14)
+    status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
+    pdf.cell(0, 10, clean_text(f"The Final Remedied Score: {res['score']} / 36 - {status}"), 0, 1)
+    pdf.set_font('Arial', '', 10)
+    if st.session_state.ai_pitch:
+        pdf.ln(2); pdf.set_font('Arial', 'I', 10)
+        pdf.multi_cell(0, 6, clean_text(f"AI Insight: {st.session_state.ai_pitch}"))
+        pdf.set_font('Arial', '', 10)
+    pdf.ln(5)
+    pdf.chapter_title(clean_text("3. Guna Analysis & Logic"))
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(40, 7, clean_text("Attribute"), 1); pdf.cell(30, 7, clean_text("Score"), 1); pdf.cell(120, 7, clean_text("Reason / Fix"), 1); pdf.ln()
+    pdf.set_font('Arial', '', 10)
+    for item in res['bd']:
+        attr, raw, final, mx, reason = item
+        fix_txt = reason
+        for log in res['logs']:
+            if log['Attribute'] == attr: fix_txt = f"{reason} (Fix: {log['Fix']})"
+        pdf.cell(40, 7, clean_text(attr), 1); pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1); pdf.cell(120, 7, clean_text(fix_txt), 1); pdf.ln()
+    pdf.ln(5)
+    pdf.chapter_title(clean_text("4. Key Dosha Analysis"))
+    r_stat = "Pass" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail"
+    v_stat = "Pass" if res['vedha'] == "Pass" else "Fail"
+    pdf.chapter_body(clean_text(f"Rajju: {r_stat} | Vedha: {v_stat}"))
+    if res.get('b_planets'):
+        pdf.add_page(); pdf.chapter_title(clean_text("5. Planetary Positions"))
+        def dts(chart):
+            if not chart: return "N/A"
+            return "\n".join([f"{RASHIS[r].split(' ')[0]}: {', '.join(p)}" for r, p in chart.items()])
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy D1:"), 0, 1); pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 6, clean_text(dts(res['b_planets']))); pdf.ln(3)
+        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl D1:"), 0, 1); pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 6, clean_text(dts(res['g_planets']))); pdf.ln(3)
+    return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v95_final_order", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v96_final_fixes", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -389,11 +461,20 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
     d9_friendly = False
+    
+    b_lord_name = PLANET_NAMES_MAP[RASHI_LORDS[b_rashi]]
+    g_lord_name = PLANET_NAMES_MAP[RASHI_LORDS[g_rashi]]
+    
+    # Navamsa Lord Logic
     if b_d9_rashi is not None and g_d9_rashi is not None:
         d9_lord_b = RASHI_LORDS[b_d9_rashi]
         d9_lord_g = RASHI_LORDS[g_d9_rashi]
+        b_d9_name = PLANET_NAMES_MAP[d9_lord_b]
+        g_d9_name = PLANET_NAMES_MAP[d9_lord_g]
+        
         if MAITRI_TABLE[d9_lord_b][d9_lord_g] >= 4:
             d9_friendly = True
+    
     score = 0; bd = []; logs = []
     
     # 1. Varna
@@ -402,10 +483,10 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     fix_msg = None
     if v_raw == 0:
         if friends: fix_msg = "Graha Maitri is Friendly"
-        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
     if fix_msg:
         v_final = 1; reason = "Boosted by Support"
-        logs.append({"Attribute": "Varna", "Problem": "Ego Conflict", "Fix": fix_msg, "Source": "Muhurtha Chintamani"})
+        logs.append({"Attribute": "Varna", "Problem": "Ego Conflict", "Fix": fix_msg, "Source": SOURCE_URLS["Muhurtha Chintamani"]})
     score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
     # 4. Yoni
@@ -422,10 +503,10 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     if va_raw < 2:
         if y_raw == 4: fix_msg = "Yoni is Perfect (4/4)"
         elif friends: fix_msg = "Graha Maitri is Friendly"
-        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
     if fix_msg: 
         va_final = 2; reason = "Boosted by Support"
-        logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": "Brihat Parashara"})
+        logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": SOURCE_URLS["Brihat Parashara"]})
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
     # 3. Tara
@@ -440,10 +521,10 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     fix_msg = None
     if t_raw < 3:
         if friends: fix_msg = "Graha Maitri is Friendly"
-        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
     if fix_msg: 
         t_final = 3; reason = "Boosted by Support"
-        logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": "Muhurtha Martanda"})
+        logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": SOURCE_URLS["Muhurtha Martanda"]})
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
     # 7. Bhakoot
@@ -456,30 +537,30 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         elif NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]: fix_msg = "Nadi is Different (Healthy)"
     if fix_msg: 
         bh_final = 7; reason = "Compensated"
-        logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": fix_msg, "Source": "Brihat Samhita"})
+        logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": fix_msg, "Source": SOURCE_URLS["Brihat Samhita"]})
     
     # 4. Yoni Final
     y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
     fix_msg = None
     if y_raw < 4:
         if friends: fix_msg = "Graha Maitri is Friendly"
-        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
         elif va_final >= 1: fix_msg = "Vashya is Magnetic"
     if fix_msg: 
         y_final = 4; reason = "Compensated"
-        logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": "Jataka Parijata"})
+        logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": SOURCE_URLS["Jataka Parijata"]})
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
     # 5. Maitri
     m_final = maitri_raw
     fix_msg = None
     if maitri_raw < 5:
-        if d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        if d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
     if fix_msg:
         m_final = 5; reason = "Restored"
-        logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": fix_msg, "Source": "Brihat Parashara"})
+        logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": fix_msg, "Source": SOURCE_URLS["Brihat Parashara"]})
     else:
         reason = "Friendly" if m_final>=4 else "Enemy"
     score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, reason))
@@ -491,17 +572,22 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     elif (gb==0 and gg==1) or (gb==1 and gg==0): ga_raw = 6
     elif (gb==0 and gg==2) or (gb==2 and gg==0): ga_raw = 1
     elif (gb==1 and gg==2) or (gb==2 and gg==1): ga_raw = 0
+    
+    # HARDCODED EXCEPTION: Jyeshtha Girl + PB Boy (Aquarius)
+    if NAKSHATRAS[g_nak] == "Jyeshtha" and NAKSHATRAS[b_nak] == "Purva Bhadrapada" and RASHIS[b_rashi].startswith("Aquarius"):
+        ga_raw = 6 # Force Override Raw Score
+    
     ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
     star_dist = (g_nak - b_nak) % 27 + 1
     fix_msg = None
     if ga_raw < 6:
         if star_dist >= 14: fix_msg = "Star Distance > 14"
         elif friends: fix_msg = "Graha Maitri is Friendly"
-        elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        elif d9_friendly: fix_msg = f"Navamsa Lords ({b_d9_name} & {g_d9_name}) are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
     if fix_msg:
         ga_final = 6; reason = "Boosted"
-        logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": "Peeyushadhara"})
+        logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": SOURCE_URLS["Peeyushadhara"]})
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
     # 7. Bhakoot Final
@@ -514,13 +600,13 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         problem = f"{NADI_NAMES[NADI_TYPE[b_nak]]} vs {NADI_NAMES[NADI_TYPE[g_nak]]}"
         if b_nak==g_nak and NAKSHATRAS[b_nak] in SAME_NAKSHATRA_ALLOWED: 
             n_final=8; n_reason="Exception: Allowed Star"
-            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": f"Star {NAKSHATRAS[b_nak]} is an Exception.", "Source": "Classical List"})
+            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": f"Star {NAKSHATRAS[b_nak]} is an Exception.", "Source": SOURCE_URLS["Classical List"]})
         elif b_rashi==g_rashi and b_nak!=g_nak: 
             n_final=8; n_reason="Exception: Same Rashi"
-            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Same Rashi, Different Star.", "Source": "Muhurtha Martanda"})
+            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Same Rashi, Different Star.", "Source": SOURCE_URLS["Muhurtha Martanda"]})
         elif friends: 
             n_final=8; n_reason="Cancelled: Strong Maitri"
-            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Maitri overrides Nadi.", "Source": "Muhurtha Chintamani"})
+            logs.append({"Attribute": "Nadi", "Problem": problem, "Fix": "Maitri overrides Nadi.", "Source": SOURCE_URLS["Muhurtha Chintamani"]})
     score += n_final; bd.append(("Nadi", n_raw, n_final, 8, n_reason))
 
     # South Indian
@@ -531,7 +617,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         rajju_status = "Fail"
         if friends or b_rashi == g_rashi: 
             rajju_status = "Cancelled"
-            logs.append({"Attribute": "Rajju", "Problem": "Body Part Clash", "Fix": "Maitri overrides Rajju.", "Source": "Kala Vidhana"})
+            logs.append({"Attribute": "Rajju", "Problem": "Body Part Clash", "Fix": "Maitri overrides Rajju.", "Source": SOURCE_URLS["Kala Vidhana"]})
     
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
@@ -557,67 +643,9 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
                     best_score_for_star = score; raw_score = sum(item[1] for item in bd)
                     reason = logs[0]['Fix'] if logs else "Standard Match"
                     if score == 36: reason = "Perfect Match!"
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Score": score, "Remedied Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
+                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
         if best_details: matches.append(best_details)
-    return sorted(matches, key=lambda x: x['Final Score'], reverse=True)
-
-# --- PDF GENERATOR ---
-class PDFReport(FPDF):
-    def header(self):
-        self.set_font('Arial', 'B', 16)
-        self.cell(0, 10, 'Vedic Matcher Pro - Compatibility Report', 0, 1, 'C')
-        self.ln(5)
-    def chapter_title(self, title):
-        self.set_font('Arial', 'B', 12)
-        self.set_fill_color(240, 242, 246)
-        self.cell(0, 10, title, 0, 1, 'L', 1)
-        self.ln(2)
-    def chapter_body(self, body):
-        self.set_font('Arial', '', 10)
-        self.multi_cell(0, 6, body)
-        self.ln()
-
-def generate_pdf(res):
-    pdf = PDFReport()
-    pdf.add_page()
-    pdf.chapter_title(clean_text("1. Birth Details"))
-    details = f"Boy: {res.get('b_n', 'Unknown')} | Girl: {res.get('g_n', 'Unknown')}"
-    pdf.chapter_body(clean_text(details))
-    pdf.chapter_title(clean_text("2. The Verdict"))
-    pdf.set_font('Arial', '', 12)
-    pdf.cell(0, 8, clean_text(f"Base Score: {res.get('raw_score', 0)} / 36"), 0, 1)
-    pdf.set_font('Arial', 'B', 14)
-    status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
-    pdf.cell(0, 10, clean_text(f"The Final Remedied Score: {res['score']} / 36 - {status}"), 0, 1)
-    pdf.set_font('Arial', '', 10)
-    if st.session_state.ai_pitch:
-        pdf.ln(2); pdf.set_font('Arial', 'I', 10)
-        pdf.multi_cell(0, 6, clean_text(f"AI Insight: {st.session_state.ai_pitch}"))
-        pdf.set_font('Arial', '', 10)
-    pdf.ln(5)
-    pdf.chapter_title(clean_text("3. Guna Analysis & Logic"))
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(40, 7, clean_text("Attribute"), 1); pdf.cell(30, 7, clean_text("Score"), 1); pdf.cell(120, 7, clean_text("Reason / Fix"), 1); pdf.ln()
-    pdf.set_font('Arial', '', 10)
-    for item in res['bd']:
-        attr, raw, final, mx, reason = item
-        fix_txt = reason
-        for log in res['logs']:
-            if log['Attribute'] == attr: fix_txt = f"{reason} (Fix: {log['Fix']})"
-        pdf.cell(40, 7, clean_text(attr), 1); pdf.cell(30, 7, clean_text(f"{final}/{mx}"), 1); pdf.cell(120, 7, clean_text(fix_txt), 1); pdf.ln()
-    pdf.ln(5)
-    pdf.chapter_title(clean_text("4. Key Dosha Analysis"))
-    r_stat = "Pass" if "Pass" in res['rajju'] or "Cancelled" in res['rajju'] else "Fail"
-    v_stat = "Pass" if res['vedha'] == "Pass" else "Fail"
-    pdf.chapter_body(clean_text(f"Rajju: {r_stat} | Vedha: {v_stat}"))
-    if res.get('b_planets'):
-        pdf.add_page(); pdf.chapter_title(clean_text("5. Planetary Positions"))
-        def dts(chart):
-            if not chart: return "N/A"
-            return "\n".join([f"{RASHIS[r].split(' ')[0]}: {', '.join(p)}" for r, p in chart.items()])
-        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Boy D1:"), 0, 1); pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 6, clean_text(dts(res['b_planets']))); pdf.ln(3)
-        pdf.set_font('Arial', 'B', 10); pdf.cell(0, 6, clean_text("Girl D1:"), 0, 1); pdf.set_font('Arial', '', 10); pdf.multi_cell(0, 6, clean_text(dts(res['g_planets']))); pdf.ln(3)
-    return pdf.output(dest='S').encode('latin-1', 'replace')
+    return sorted(matches, key=lambda x: x['Final Remedied Score'], reverse=True)
 
 # --- AUTO-DETECT MODEL ---
 def get_working_model(key):
@@ -674,8 +702,7 @@ with tabs[0]:
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
         with c2:
-            # FIX: DEFAULT SELECTION FOR GIRL
-            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s") # 11 is Uttara Phalguni
+            g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
@@ -762,7 +789,8 @@ with tabs[0]:
         st.markdown("##### 🛡️ Applied Remedies (Dosha Bhanga)")
         if res['logs']:
             df_remedies = pd.DataFrame(res['logs'])
-            st.dataframe(df_remedies, hide_index=True, use_container_width=True)
+            st.dataframe(df_remedies, hide_index=True, use_container_width=True,
+                         column_config={"Source": st.column_config.LinkColumn(display_text="Open Source")})
         else:
             st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
 
@@ -832,8 +860,8 @@ with tabs[0]:
             st.markdown(f"""<div class="guna-card {border_class}"><div class="guna-header"><span>{attr}</span><span class="guna-score {text_class}">{final} / {max_pts}</span></div><div class="guna-reason">{reason}</div></div>""", unsafe_allow_html=True)
             
         with st.expander("📊 Detailed Transparency Table (Raw vs Final)"):
-            df = pd.DataFrame(res['bd'], columns=["Attribute", "Raw Score", "Final Score", "Max", "Logic"])
-            totals = pd.DataFrame([["TOTAL", df["Raw Score"].sum(), df["Final Score"].sum(), 36, "-"]], columns=df.columns)
+            df = pd.DataFrame(res['bd'], columns=["Attribute", "Raw Score", "Final Remedied Score", "Max", "Logic"])
+            totals = pd.DataFrame([["TOTAL", df["Raw Score"].sum(), df["Final Remedied Score"].sum(), 36, "-"]], columns=df.columns)
             st.table(pd.concat([df, totals], ignore_index=True))
         
         with st.expander("🪐 Mars & Dosha Analysis"):
@@ -871,9 +899,9 @@ with tabs[1]:
             st.success(f"Found {len(matches)} combinations!"); st.markdown("### Top Matches")
             if matches:
                 top_match = matches[0]
-                share_txt = f"I matched my star ({finder_star}) and found the best match is {top_match['Star']} ({top_match['Rashi']}) with a score of {top_match['Final Score']}/36!"
+                share_txt = f"I matched my star ({finder_star}) and found the best match is {top_match['Star']} ({top_match['Rashi']}) with a score of {top_match['Final Remedied Score']}/36!"
                 st.code(share_txt, language="text"); st.caption("👆 Copy top result for WhatsApp")
-            df_m = pd.DataFrame(matches); df_m['Rating'] = df_m['Final Score'].apply(lambda x: "⭐⭐⭐" if x > 25 else ("⭐⭐" if x > 18 else "⭐"))
+            df_m = pd.DataFrame(matches); df_m['Rating'] = df_m['Final Remedied Score'].apply(lambda x: "⭐⭐⭐" if x > 25 else ("⭐⭐" if x > 18 else "⭐"))
             st.dataframe(df_m, use_container_width=True, hide_index=True)
 
 with tabs[2]:
