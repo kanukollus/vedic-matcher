@@ -214,7 +214,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v98_smart_pada", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v99_pada_input", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -689,12 +689,14 @@ with tabs[0]:
             b_star = st.selectbox("Boy Star", NAKSHATRAS, key="b_s")
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
+            b_pada_sel = st.selectbox("Boy Pada", [1, 2, 3, 4], key="b_p") # Added Padas
         with c2:
             g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
+            g_pada_sel = st.selectbox("Girl Pada", [1, 2, 3, 4], key="g_p") # Added Padas
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
         try:
@@ -722,6 +724,11 @@ with tabs[0]:
                 else:
                     b_nak = NAKSHATRAS.index(b_star); b_rashi = RASHIS.index(b_rashi_sel)
                     g_nak = NAKSHATRAS.index(g_star); g_rashi = RASHIS.index(g_rashi_sel)
+                    
+                    # Direct Mode D9 Calculation
+                    b_d9_rashi = get_d9_rashi_from_pada(b_nak, b_pada_sel)
+                    g_d9_rashi = get_d9_rashi_from_pada(g_nak, g_pada_sel)
+                    
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
                 score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
