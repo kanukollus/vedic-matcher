@@ -48,6 +48,16 @@ st.markdown("""
     .verdict-title { font-size: 20px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
     
     .synergy-box { background-color: #f3e5f5; border: 1px solid #e1bee7; padding: 15px; border-radius: 10px; margin-top: 15px; color: #4a148c; }
+    
+    /* GAUGE TITLES */
+    .gauge-title {
+        text-align: center;
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: -10px; /* Pull gauge closer to title */
+        z-index: 10;
+        position: relative;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -81,16 +91,17 @@ SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10]
 SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
 NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 
-# SYNERGY INTERPRETATIONS
+# SYNERGY INTERPRETATIONS (Use Full Names as Keys)
 SYNERGY_MEANINGS = {
     "Sun": "Aligned Egos. You shine in similar ways and understand each other's pride.",
     "Moon": "Deep Empathy. You intuitively understand each other's moods and needs.",
     "Mars": "Synced Energy. You share the same drive, passion, and fighting style.",
     "Merc": "Intellectual Bond. You communicate effortlessly and think alike.",
-    "Jup": "Shared Values. You have the same moral compass and life philosophy.",
-    "Ven": "Romantic Sync. You share similar tastes in love, luxury, and aesthetics.",
-    "Sat": "Karmic Strength. You share a similar work ethic and approach to challenges.",
-    "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths."
+    "Jupiter": "Shared Values. You have the same moral compass and life philosophy.",
+    "Venus": "Romantic Sync. You share similar tastes in love, luxury, and aesthetics.",
+    "Saturn": "Karmic Strength. You share a similar work ethic and approach to challenges.",
+    "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths.",
+    "Ketu": "Past Life Bond. A deep, spiritual sense of knowing each other from before."
 }
 
 # --- PDF GENERATOR ---
@@ -129,6 +140,7 @@ def generate_pdf(res):
     # 2. Verdict
     pdf.chapter_title(clean_text("2. The Verdict"))
     pdf.set_font('Arial', '', 12)
+    # PDF: Show both scores
     pdf.cell(0, 8, clean_text(f"Base Score: {res.get('raw_score', 0)} / 36"), 0, 1)
     pdf.set_font('Arial', 'B', 14)
     status = "Excellent Match" if res['score'] > 24 else ("Good Match" if res['score'] > 18 else "Not Recommended")
@@ -206,7 +218,7 @@ def generate_pdf(res):
 
 # --- HELPER FUNCTIONS ---
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v87_layout_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v89_final_fixes", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -279,7 +291,7 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     # t = (jd - 2451545.0) / 36525
     jd = ephem.julian_date(obs.date)
     t = (jd - 2451545.0) / 36525.0
-    ayanamsa = 23.85 + 1.4 * t 
+    ayanamsa = 23.85 + 1.4 * t # Simplified rate
     
     s_moon = (math.degrees(ephem.Ecliptic(moon).lon) - ayanamsa) % 360
     s_mars = (math.degrees(ephem.Ecliptic(mars).lon) - ayanamsa) % 360
@@ -290,26 +302,40 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
     
     if detailed:
         bodies = [ephem.Sun(), ephem.Moon(), ephem.Mars(), ephem.Mercury(), ephem.Jupiter(), ephem.Venus(), ephem.Saturn()]
-        names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"] 
-        d1_chart_data = {}; d9_chart_data = {}
+        names = ["Su", "Mo", "Ma", "Me", "Ju", "Ve", "Sa"] # Short names for chart
+        
+        d1_chart_data = {}
+        d9_chart_data = {}
+        
+        # 1. Main Planets
         for body, name in zip(bodies, names):
             body.compute(obs)
             long = (math.degrees(ephem.Ecliptic(body).lon) - ayanamsa) % 360
+            
+            # D1
             r_idx_d1 = int(long / 30)
             if r_idx_d1 not in d1_chart_data: d1_chart_data[r_idx_d1] = []
             d1_chart_data[r_idx_d1].append(name)
+            
+            # D9
             r_idx_d9 = calculate_d9_position(long)
             if r_idx_d9 not in d9_chart_data: d9_chart_data[r_idx_d9] = []
             d9_chart_data[r_idx_d9].append(name)
             
+        # 2. Rahu & Ketu (Mean Node)
         rahu_l, ketu_l = calculate_rahu_ketu_mean(jd)
-        rahu_sid = (rahu_l - ayanamsa) % 360; ketu_sid = (ketu_l - ayanamsa) % 360
+        rahu_sid = (rahu_l - ayanamsa) % 360
+        ketu_sid = (ketu_l - ayanamsa) % 360
+        
+        # Add Rahu
         r_idx = int(rahu_sid / 30)
         if r_idx not in d1_chart_data: d1_chart_data[r_idx] = []
         d1_chart_data[r_idx].append("Ra")
         r_d9 = calculate_d9_position(rahu_sid)
         if r_d9 not in d9_chart_data: d9_chart_data[r_d9] = []
         d9_chart_data[r_d9].append("Ra")
+        
+        # Add Ketu
         k_idx = int(ketu_sid / 30)
         if k_idx not in d1_chart_data: d1_chart_data[k_idx] = []
         d1_chart_data[k_idx].append("Ke")
@@ -317,14 +343,19 @@ def get_planetary_positions(date_obj, time_obj, city, country, detailed=False):
         if k_d9 not in d9_chart_data: d9_chart_data[k_d9] = []
         d9_chart_data[k_d9].append("Ke")
         
-        asc_trop = calculate_ascendant(obs, jd)
+        # 3. Ascendant (Lagna)
+        asc_trop = calculate_ascendant(obs, jd) # This returns tropical roughly from formula
+        # Actually standard formula with RAMC gives Tropical Ascendant.
+        # We must subtract ayanamsa.
         asc_sid = (asc_trop - ayanamsa) % 360
+        
         a_idx = int(asc_sid / 30)
         if a_idx not in d1_chart_data: d1_chart_data[a_idx] = []
-        d1_chart_data[a_idx].append("Asc")
+        d1_chart_data[a_idx].append("Asc") # Lagna in D1
+        
         a_d9 = calculate_d9_position(asc_sid)
         if a_d9 not in d9_chart_data: d9_chart_data[a_d9] = []
-        d9_chart_data[a_d9].append("Asc")
+        d9_chart_data[a_d9].append("Asc") # Lagna in D9
 
     return s_moon, s_mars, s_sun, msg, d1_chart_data, d9_chart_data
 
@@ -341,6 +372,7 @@ def render_south_indian_chart(positions, title):
     grid_items = [""] * 16
     for rashi_idx, planets in positions.items():
         if rashi_idx in SOUTH_CHART_MAP:
+            # Use short names already in list
             grid_pos = SOUTH_CHART_MAP[rashi_idx]
             grid_items[grid_pos] = "<br>".join(planets)
     return f"""
@@ -397,25 +429,31 @@ def analyze_aspects_and_occupation_rich(chart_data, moon_rashi):
     if not chart_data: return []
     house_7_idx = (moon_rashi + 6) % 12
     observations = []
+    
     occupants = chart_data.get(house_7_idx, [])
     if occupants:
         names = ", ".join(occupants)
-        if any(p in ["Sa", "Ma", "Ra", "Ke", "Su"] for p in occupants): 
+        if any(p in ["Sa", "Ma", "Ra", "Ke", "Su"] for p in occupants): # Updated short names
             observations.append(f"⚠️ **{names} in 7th House:** This placement often creates friction or delays in marriage. It requires maturity.")
         elif any(p in ["Ju", "Ve", "Me"] for p in occupants):
             observations.append(f"✅ **{names} in 7th House:** A blessing. These planets bring natural harmony and affection.")
+            
     aspectors = []
     for r_idx, planets in chart_data.items():
         dist = (house_7_idx - r_idx) % 12 + 1 
         for p in planets:
+            # Map Short names back to Keys for SPECIAL_ASPECTS
             p_full = "Mars" if p == "Ma" else ("Jupiter" if p == "Ju" else ("Saturn" if p == "Sa" else ("Rahu" if p == "Ra" else ("Ketu" if p == "Ke" else p))))
+            
             if p_full in SPECIAL_ASPECTS and dist in SPECIAL_ASPECTS[p_full]: aspectors.append(p_full)
             elif dist == 7: aspectors.append(p_full)
+                
     if aspectors:
         aspectors = list(set(aspectors))
         if "Saturn" in aspectors: observations.append("ℹ️ **Saturn's Gaze:** Saturn looks at the marriage house. This indicates the relationship will mature slowly.")
         if "Mars" in aspectors: observations.append("🔥 **Mars' Gaze:** Mars adds energy and passion, but arguments can get heated.")
         if "Jupiter" in aspectors: observations.append("🛡️ **Jupiter's Gaze:** The 'Great Benefic' protects the marriage like a safety net.")
+        
     return observations
 
 def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
@@ -423,12 +461,15 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     if score >= 25: verdict += "Mathematically, this is an **Excellent Match**."
     elif score >= 18: verdict += "Mathematically, this is a **Good Match** compatible for marriage."
     else: verdict += "Mathematically, the compatibility score is on the lower side."
+    
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
+    
     verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
     if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
         verdict += "Since both are running similar intense periods, mutual patience is key."
     else: verdict += "These periods complement each other well for growth."
+        
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -440,47 +481,53 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
 def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=None):
     maitri_raw = MAITRI_TABLE[RASHI_LORDS[b_rashi]][RASHI_LORDS[g_rashi]]
     friends = maitri_raw >= 4
+    
     d9_friendly = False
     if b_d9_rashi is not None and g_d9_rashi is not None:
         d9_lord_b = RASHI_LORDS[b_d9_rashi]
         d9_lord_g = RASHI_LORDS[g_d9_rashi]
         if MAITRI_TABLE[d9_lord_b][d9_lord_g] >= 4:
             d9_friendly = True
+
     score = 0; bd = []; logs = []
     
-    # 1. Varna
+    # 1. Varna (Muhurtha Chintamani)
     v_raw = 1 if VARNA_GROUP[b_rashi] <= VARNA_GROUP[g_rashi] else 0
     v_final = v_raw; reason = "Natural Match" if v_raw == 1 else "Mismatch"
+    
     fix_msg = None
     if v_raw == 0:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+    
     if fix_msg:
         v_final = 1; reason = "Boosted by Support"
         logs.append({"Attribute": "Varna", "Problem": "Ego Conflict", "Fix": fix_msg, "Source": "Muhurtha Chintamani"})
     score += v_final; bd.append(("Varna", v_raw, v_final, 1, reason))
     
-    # 4. Yoni
+    # 4. Yoni (Early Calc)
     y_raw = 4 if YONI_ID[b_nak] == YONI_ID[g_nak] else (0 if YONI_Enemy_Map.get(YONI_ID[b_nak]) == YONI_ID[g_nak] else 2)
     y_final = y_raw 
     
-    # 2. Vashya
+    # 2. Vashya (Brihat Parashara)
     va_raw = 0
     if VASHYA_GROUP[b_rashi] == VASHYA_GROUP[g_rashi]: va_raw = 2
     elif (VASHYA_GROUP[b_rashi] == 0 and VASHYA_GROUP[g_rashi] == 1) or (VASHYA_GROUP[b_rashi] == 1 and VASHYA_GROUP[g_rashi] == 0): va_raw = 1 
     elif VASHYA_GROUP[b_rashi] != VASHYA_GROUP[g_rashi]: va_raw = 0.5 
     va_final = va_raw; reason = "Magnetic" if va_raw >= 1 else "Mismatch"
+    
     fix_msg = None
     if va_raw < 2:
         if y_raw == 4: fix_msg = "Yoni is Perfect (4/4)"
         elif friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        
     if fix_msg: 
         va_final = 2; reason = "Boosted by Support"
         logs.append({"Attribute": "Vashya", "Problem": f"Attraction Mismatch", "Fix": fix_msg, "Source": "Brihat Parashara"})
     score += va_final; bd.append(("Vashya", va_raw, va_final, 2, reason))
     
-    # 3. Tara
+    # 3. Tara (Muhurtha Martanda)
     cnt_b_g = (g_nak - b_nak) % 27 + 1
     cnt_g_b = (b_nak - g_nak) % 27 + 1
     t1_bad = cnt_b_g % 9 in [3, 5, 7]
@@ -489,46 +536,53 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     if t1_bad and t2_bad: t_raw = 0
     elif t1_bad or t2_bad: t_raw = 1.5
     t_final = t_raw; reason = "Benefic" if t_raw == 3 else ("Mixed" if t_raw == 1.5 else "Malefic")
+    
     fix_msg = None
     if t_raw < 3:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
+        
     if fix_msg: 
         t_final = 3; reason = "Boosted by Support"
         logs.append({"Attribute": "Tara", "Problem": "Malefic Star Position", "Fix": fix_msg, "Source": "Muhurtha Martanda"})
     score += t_final; bd.append(("Tara", t_raw, t_final, 3, reason))
     
-    # 7. Bhakoot
+    # 7. Bhakoot (MOVE UP - ORDER FIX)
     dist = (b_rashi-g_rashi)%12
     bh_raw = 7 if dist not in [1, 11, 4, 8, 5, 7] else 0
     bh_final = bh_raw; reason = "Love Flow" if bh_raw == 7 else "Blocked"
+    
     fix_msg = None
     if bh_raw == 0:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif NADI_TYPE[b_nak]!=NADI_TYPE[g_nak]: fix_msg = "Nadi is Different (Healthy)"
+        
     if fix_msg: 
         bh_final = 7; reason = "Compensated"
         logs.append({"Attribute": "Bhakoot", "Problem": f"Bad Position", "Fix": fix_msg, "Source": "Brihat Samhita"})
     
-    # 4. Yoni Final
+    # 4. Yoni (Finalize)
     y_final = y_raw; reason = "Perfect" if y_raw == 4 else "Mismatch"
+    
     fix_msg = None
     if y_raw < 4:
         if friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
         elif va_final >= 1: fix_msg = "Vashya is Magnetic"
+        
     if fix_msg: 
         y_final = 4; reason = "Compensated"
         logs.append({"Attribute": "Yoni", "Problem": "Nature Mismatch", "Fix": fix_msg, "Source": "Jataka Parijata"})
     score += y_final; bd.append(("Yoni", y_raw, y_final, 4, reason))
     
-    # 5. Maitri
+    # 5. Maitri (Brihat Parashara)
     m_final = maitri_raw
     fix_msg = None
     if maitri_raw < 5:
         if d9_friendly: fix_msg = "Navamsa Lords are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
+        
     if fix_msg:
         m_final = 5; reason = "Restored"
         logs.append({"Attribute": "Maitri", "Problem": "Planetary Enemy", "Fix": fix_msg, "Source": "Brihat Parashara"})
@@ -536,7 +590,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         reason = "Friendly" if m_final>=4 else "Enemy"
     score += m_final; bd.append(("Maitri", maitri_raw, m_final, 5, reason))
     
-    # 6. Gana
+    # 6. Gana (Peeyushadhara)
     gb, gg = GANA_TYPE[b_nak], GANA_TYPE[g_nak]
     ga_raw = 0
     if gb == gg: ga_raw = 6
@@ -545,21 +599,23 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     elif (gb==1 and gg==2) or (gb==2 and gg==1): ga_raw = 0
     ga_final = ga_raw; reason = "Match" if ga_raw >= 5 else "Mismatch"
     star_dist = (g_nak - b_nak) % 27 + 1
+    
     fix_msg = None
     if ga_raw < 6:
         if star_dist >= 14: fix_msg = "Star Distance > 14"
         elif friends: fix_msg = "Graha Maitri is Friendly"
         elif d9_friendly: fix_msg = "Navamsa Lords are Friendly"
         elif bh_final == 7: fix_msg = "Bhakoot is Beneficial"
+        
     if fix_msg:
         ga_final = 6; reason = "Boosted"
         logs.append({"Attribute": "Gana", "Problem": "Temperament Clash", "Fix": fix_msg, "Source": "Peeyushadhara"})
     score += ga_final; bd.append(("Gana", ga_raw, ga_final, 6, reason))
     
-    # 7. Bhakoot Final
+    # 7. Bhakoot (Append Score Now)
     score += bh_final; bd.append(("Bhakoot", bh_raw, bh_final, 7, "Love Flow" if bh_final == 7 else "Blocked"))
     
-    # 8. Nadi
+    # 8. Nadi (Muhurtha Chintamani)
     n_raw = 8; n_final = 8; n_reason = "Healthy"
     if NADI_TYPE[b_nak] == NADI_TYPE[g_nak]:
         n_raw = 0; n_final = 0; n_reason = "Same Nadi (Dosha)"
@@ -591,30 +647,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         vedha_status = "Fail"
 
     return score, bd, logs, rajju_status, vedha_status
-
-def format_chart_for_ai(chart_data):
-    if not chart_data: return "Chart not generated."
-    readable = []
-    for r_idx, planets in chart_data.items():
-        if planets: readable.append(f"{RASHIS[r_idx]}: {', '.join(planets)}")
-    return "; ".join(readable)
-
-def get_jupiter_position_for_year(year):
-    dt = datetime.date(year, 7, 1); obs = ephem.Observer(); obs.date = dt
-    jupiter = ephem.Jupiter(); jupiter.compute(obs); ecl = ephem.Ecliptic(jupiter)
-    ayanamsa = 23.85 + (year - 2000) * 0.01396
-    return int(((math.degrees(ecl.lon) - ayanamsa) % 360) / 30)
-
-def predict_marriage_luck_years(rashi_idx):
-    predictions = []
-    for year in [2025, 2026, 2027]:
-        jup_rashi = get_jupiter_position_for_year(year)
-        house = (jup_rashi - rashi_idx) % 12 + 1
-        res = "✨ Excellent" if house in [2, 5, 7, 9, 11] else "Neutral"
-        predictions.append((year, res))
-    return predictions
-
-def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     matches = []
@@ -655,8 +687,11 @@ def get_shared_positions(b_chart, g_chart):
     for p in b_pos:
         if p in g_pos and b_pos[p] == g_pos[p]:
             r_name = RASHIS[b_pos[p]].split(" ")[0] 
-            meaning = SYNERGY_MEANINGS.get(p, "Strong Connection")
-            shared.append(f"**Shared {p} ({r_name}):** {meaning}")
+            # Key Translation for Synergy Lookup
+            p_key = "Mars" if p == "Ma" else ("Jupiter" if p == "Ju" else ("Saturn" if p == "Sa" else ("Rahu" if p == "Ra" else ("Ketu" if p == "Ke" else ("Sun" if p == "Su" else ("Moon" if p == "Mo" else ("Mercury" if p == "Me" else ("Venus" if p == "Ve" else p))))))))
+            
+            meaning = SYNERGY_MEANINGS.get(p_key, "Strong Connection")
+            shared.append(f"**Shared {p_key} ({r_name}):** {meaning}")
             
     return shared
 
@@ -783,25 +818,27 @@ with tabs[0]:
         if score_val >= 18: score_color = "#ffa500"
         if score_val >= 25: score_color = "#00cc00"
 
-        # ROW 1: BASE GAUGE | REMEDIED GAUGE (Title on Top)
-        c1, c2 = st.columns([1, 1])
+        # ROW 1: GAUGES (50/50 Split)
+        c_base, c_rem = st.columns([1, 1])
         
-        with c1:
+        with c_base:
+             # Base Score Title (Markdown)
+             st.markdown(f"<h3 style='text-align: center; color: #888; margin-bottom: 0px;'>Base Score</h3>", unsafe_allow_html=True)
              fig_base = go.Figure(go.Indicator(
                 mode = "gauge+number", value = res['raw_score'],
-                title = {'text': "Base Score", 'font': {'size': 20, 'color': "#888"}},
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': "#cccccc"}}
             ))
-             fig_base.update_layout(height=180, margin=dict(l=20, r=20, t=40, b=20))
+             fig_base.update_layout(height=180, margin=dict(l=20, r=20, t=10, b=10)) # Reduced top margin
              st.plotly_chart(fig_base, use_container_width=True)
 
-        with c2:
+        with c_rem:
+             # Remedied Score Title (Markdown)
+             st.markdown(f"<h3 style='text-align: center; color: {score_color}; margin-bottom: 0px;'>The Final Remedied Score</h3>", unsafe_allow_html=True)
              fig_rem = go.Figure(go.Indicator(
                 mode = "gauge+number", value = res['score'],
-                title = {'text': "The Final Remedied Score", 'font': {'size': 20, 'color': score_color}},
                 gauge = {'axis': {'range': [0, 36]}, 'bar': {'color': score_color}}
             ))
-             fig_rem.update_layout(height=180, margin=dict(l=20, r=20, t=40, b=20))
+             fig_rem.update_layout(height=180, margin=dict(l=20, r=20, t=10, b=10))
              st.plotly_chart(fig_rem, use_container_width=True)
 
         # ROW 2: APPLIED REMEDIES TABLE (Full Width)
@@ -812,7 +849,7 @@ with tabs[0]:
         else:
             st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
 
-        # ROW 3: VERDICT BANNER (Smaller Font)
+        # ROW 3: VERDICT BANNER (Full Width)
         status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
         st.markdown(f"""
         <div style="background-color: {score_color}20; border: 2px solid {score_color}; padding: 10px; border-radius: 10px; margin-top: 10px; text-align: center;">
