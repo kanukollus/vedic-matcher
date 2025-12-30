@@ -214,7 +214,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v99_pada_input", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v100_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -621,18 +621,30 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
         target_star_name = NAKSHATRAS[i]
         best_score_for_star = -1
         best_details = {}
+        best_padas = [] # Track all best padas
+        
         for t_pada in range(1, 5):
             valid_rashis = NAK_TO_RASHI_MAP[i]
             for t_rashi_idx in valid_rashis:
                 t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
                 if source_gender == "Boy": score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
                 else: score, bd, logs, _, _ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+                
+                # Logic to capture ties
                 if score > best_score_for_star:
-                    best_score_for_star = score; raw_score = sum(item[1] for item in bd)
+                    best_score_for_star = score
+                    best_padas = [t_pada] # Reset list with new winner
+                    raw_score = sum(item[1] for item in bd)
                     reason = logs[0]['Fix'] if logs else "Standard Match"
                     if score == 36: reason = "Perfect Match!"
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Notes": reason + f" (Pada {t_pada})"}
-        if best_details: matches.append(best_details)
+                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Reason": reason}
+                elif score == best_score_for_star:
+                    best_padas.append(t_pada) # Add to tie list
+
+        if best_details: 
+            best_details['Notes'] = f"{best_details['Reason']} (Padas: {', '.join(map(str, best_padas))})"
+            matches.append(best_details)
+            
     return sorted(matches, key=lambda x: x['Final Remedied Score'], reverse=True)
 
 # --- AUTO-DETECT MODEL ---
@@ -689,14 +701,14 @@ with tabs[0]:
             b_star = st.selectbox("Boy Star", NAKSHATRAS, key="b_s")
             b_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(b_star)]]
             b_rashi_sel = st.selectbox("Boy Rashi", b_rashi_opts, key="b_r")
-            b_pada_sel = st.selectbox("Boy Pada", [1, 2, 3, 4], key="b_p") # Added Padas
+            b_pada_sel = st.selectbox("Boy Pada", [1, 2, 3, 4], key="b_p")
         with c2:
             g_star = st.selectbox("Girl Star", NAKSHATRAS, index=11, key="g_s")
             g_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(g_star)]]
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
-            g_pada_sel = st.selectbox("Girl Pada", [1, 2, 3, 4], key="g_p") # Added Padas
+            g_pada_sel = st.selectbox("Girl Pada", [1, 2, 3, 4], index=3, key="g_p")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
         try:
@@ -882,7 +894,7 @@ with tabs[1]:
     with col_f1: 
         finder_gender = st.selectbox("I am a", ["Boy", "Girl"])
         finder_star = st.selectbox("My Star", NAKSHATRAS)
-        finder_pada = st.selectbox("My Pada", [1, 2, 3, 4])
+        finder_pada = st.selectbox("My Pada", [1, 2, 3, 4], index=3, key="f_p") # Default to 4
     with col_f2: 
         finder_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(finder_star)]]
         finder_rashi = st.selectbox("My Rashi", finder_rashi_opts)
