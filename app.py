@@ -220,7 +220,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v108_export_features", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v109_final_cleanup", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -642,41 +642,42 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     s_d9_rashi = get_d9_rashi_from_pada(s_nak, s_pada)
     for i in range(27): 
         target_star_name = NAKSHATRAS[i]
-        best_score_for_star = -1
-        best_details = {}
-        best_padas = [] 
         
+        # Iterate all 4 padas
         for t_pada in range(1, 5):
             valid_rashis = NAK_TO_RASHI_MAP[i]
-            for t_rashi_idx in valid_rashis:
-                t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
-                if source_gender == "Boy": score, bd, logs, _, _, safety = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
-                else: score, bd, logs, _, _, safety = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
-                
-                is_risky = (safety == "Risky Match ❌")
-                
-                if score > best_score_for_star:
-                    best_score_for_star = score
-                    best_padas = [t_pada] # Reset list
-                    raw_score = sum(item[1] for item in bd)
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "IsRisky": is_risky}
-                
-                elif score == best_score_for_star:
-                    if best_details.get("IsRisky") and not is_risky:
-                        best_padas = [t_pada]
-                        best_details['IsRisky'] = False 
-                    elif best_details.get("IsRisky") == is_risky:
-                        best_padas.append(t_pada)
-
-        if best_details: 
-            unique_padas = sorted(list(set(best_padas)))
-            pada_str = ", ".join(map(str, unique_padas))
-            rashi_simple = best_details['Rashi'].split(" ")[0]
-            risk_icon = "⚠️" if best_details['IsRisky'] else ""
-            best_details['Match Details'] = f"{risk_icon} {best_details['Star']} ({rashi_simple}) (Padas: {pada_str})"
-            matches.append(best_details)
+            # Precise Rashi Calculation for Pada
+            star_span = 13.3333333333333
+            pada_span = 3.3333333333333
+            star_start_deg = i * star_span
+            pada_start_deg = star_start_deg + (t_pada - 1) * pada_span
+            mid_pada_deg = pada_start_deg + 1.0 
+            t_rashi_idx = int(mid_pada_deg / 30)
             
-    return sorted(matches, key=lambda x: x['Final Remedied Score'], reverse=True)
+            t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
+            
+            if source_gender == "Boy": 
+                score, bd, logs, _, _, safety = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
+            else: 
+                score, bd, logs, _, _, safety = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+            
+            is_risky = (safety == "Risky Match ❌")
+            
+            if score > 18:
+                raw_score = sum(item[1] for item in bd)
+                rashi_simple = RASHIS[t_rashi_idx].split(" ")[0]
+                risk_icon = "⚠️" if is_risky else ""
+                
+                match_entry = {
+                    "Match Details": f"{risk_icon} {target_star_name} ({rashi_simple}) - Pada {t_pada}",
+                    "Final Remedied Score": score,
+                    "Raw Score": raw_score,
+                    "IsRisky": is_risky
+                }
+                matches.append(match_entry)
+            
+    # Default Sorting: Raw Score (Highest First) as requested
+    return sorted(matches, key=lambda x: x['Raw Score'], reverse=True)
 
 # --- AUTO-DETECT MODEL ---
 def get_working_model(key):
@@ -974,9 +975,6 @@ with tabs[1]:
                 df_export = pd.DataFrame(filtered_matches)
                 csv_data = to_csv(df_export)
                 st.download_button(label="📥 Download Results as CSV", data=csv_data, file_name="match_results.csv", mime="text/csv")
-                
-                # Copy Text
-                st.text_area("📋 Copy Top Result:", value=f"*Best Match:* {filtered_matches[0]['Match Details']}\n*Score:* {filtered_matches[0]['Final Remedied Score']}/36", height=70)
 
             # Render Table (HTML - No Indentation Trick)
             if filtered_matches:
