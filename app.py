@@ -717,7 +717,7 @@ tabs = st.tabs(["❤️ Match", "🔍 Find Matches", "💍 Wedding Dates", "🤖
 # --- TAB 1: MATCH ---
 with tabs[0]:
     input_method = st.radio("Mode:", ["Birth Details", "Direct Star Entry"], horizontal=True, key="input_mode")
-    pro_mode = False
+    pro_mode = st.toggle("✨ Generate Full Horoscopes (Pro Feature)", value=True)
     
     if input_method == "Birth Details":
         c1, c2 = st.columns(2)
@@ -734,7 +734,6 @@ with tabs[0]:
             g_city = st.text_input("City", "Hyderabad", key="g_c")
             g_country = st.text_input("Country", "India", key="g_co")
         st.markdown("---")
-        pro_mode = st.toggle("✨ Generate Full Horoscopes (Pro Feature)")
     else:
         st.info("ℹ️ **Note:** Advanced Horoscope features are available only with full Birth Details.")
         c1, c2 = st.columns(2)
