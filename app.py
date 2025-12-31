@@ -214,7 +214,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v100_final", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v101_critical_check", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -611,8 +611,25 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
     if vedha_pairs.get(g_nak) == b_nak:
         vedha_status = "Fail"
+    
+    # CRITICAL SAFETY CHECK
+    # Check if Nadi AND Bhakoot are BOTH 0. If so, override score to 0 or flag as dangerous.
+    # The sum logic above adds them. Let's inspect 'breakdown' to be sure.
+    # Indices in breakdown tuples: 0=Name, 1=Raw, 2=Final
+    # Bhakoot is index 6 (7th item), Nadi is index 7 (8th item) in current flow
+    # But safer to check names.
+    
+    bhakoot_score = 0
+    nadi_score = 0
+    for item in bd:
+        if item[0] == "Bhakoot": bhakoot_score = item[2]
+        if item[0] == "Nadi": nadi_score = item[2]
+        
+    final_status_override = None
+    if score > 18 and bhakoot_score == 0 and nadi_score == 0:
+        final_status_override = "Risky Match ❌"
 
-    return score, bd, logs, rajju_status, vedha_status
+    return score, bd, logs, rajju_status, vedha_status, final_status_override
 
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     matches = []
@@ -621,25 +638,24 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
         target_star_name = NAKSHATRAS[i]
         best_score_for_star = -1
         best_details = {}
-        best_padas = [] # Track all best padas
+        best_padas = [] 
         
         for t_pada in range(1, 5):
             valid_rashis = NAK_TO_RASHI_MAP[i]
             for t_rashi_idx in valid_rashis:
                 t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
-                if source_gender == "Boy": score, bd, logs, _, _ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
-                else: score, bd, logs, _, _ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+                if source_gender == "Boy": score, bd, logs, _, _, _ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
+                else: score, bd, logs, _, _, _ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
                 
-                # Logic to capture ties
                 if score > best_score_for_star:
                     best_score_for_star = score
-                    best_padas = [t_pada] # Reset list with new winner
+                    best_padas = [t_pada]
                     raw_score = sum(item[1] for item in bd)
                     reason = logs[0]['Fix'] if logs else "Standard Match"
                     if score == 36: reason = "Perfect Match!"
                     best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Reason": reason}
                 elif score == best_score_for_star:
-                    best_padas.append(t_pada) # Add to tie list
+                    best_padas.append(t_pada)
 
         if best_details: 
             best_details['Notes'] = f"{best_details['Reason']} (Padas: {', '.join(map(str, best_padas))})"
@@ -743,7 +759,7 @@ with tabs[0]:
                     
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
 
-                score, breakdown, logs, rajju, vedha = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
+                score, breakdown, logs, rajju, vedha, safety_override = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
                 raw_score = sum(row[1] for row in breakdown)
                 
                 b_obs, g_obs = [], []
@@ -761,7 +777,8 @@ with tabs[0]:
                     "b_planets": b_planets, "g_planets": g_planets,
                     "b_d9": b_d9, "g_d9": g_d9,
                     "verdict": human_verdict, "b_obs": b_obs, "g_obs": g_obs,
-                    "b_dasha": f"{b_dasha_name}", "g_dasha": f"{g_dasha_name}"
+                    "b_dasha": f"{b_dasha_name}", "g_dasha": f"{g_dasha_name}",
+                    "safety": safety_override
                 }
                 st.session_state.calculated = True
                 st.session_state.ai_pitch = ""
@@ -773,6 +790,10 @@ with tabs[0]:
         score_val = res['score']; score_color = "#ff4b4b"
         if score_val >= 18: score_color = "#ffa500"
         if score_val >= 25: score_color = "#00cc00"
+        
+        # Override Color if Risky
+        if res.get('safety') == "Risky Match ❌":
+            score_color = "#ff4b4b" # Force Red
 
         c1, c2 = st.columns([1, 1])
         with c1:
@@ -801,6 +822,11 @@ with tabs[0]:
             st.info("No special cancellations (remedies) were needed. The Base Score is the Final Score.")
 
         status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
+        
+        # Override Status if Risky
+        if res.get('safety') == "Risky Match ❌":
+            status = "Risky Match ❌ (Zero Bhakoot + Zero Nadi)"
+        
         st.markdown(f"""
         <div style="background-color: {score_color}20; border: 2px solid {score_color}; padding: 10px; border-radius: 10px; margin-top: 10px; text-align: center;">
             <h3 style="color: {score_color}; margin: 0; font-size: 24px;">{status}</h3>
