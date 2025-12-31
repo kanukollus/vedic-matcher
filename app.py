@@ -220,7 +220,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v109_final_cleanup", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v111_countries_and_report", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -719,11 +719,13 @@ with tabs[0]:
             b_date = st.date_input("Date", datetime.date(1995,1,1), key="b_d")
             b_time = st.time_input("Time", datetime.time(10,0), step=60, key="b_t")
             b_city = st.text_input("City", "Hyderabad", key="b_c")
+            b_country = st.text_input("Country", "India", key="b_co")
         with c2:
             st.markdown("### 👰 Girl")
             g_date = st.date_input("Date", datetime.date(1994,11,28), key="g_d")
             g_time = st.time_input("Time", datetime.time(7,30), step=60, key="g_t")
             g_city = st.text_input("City", "Hyderabad", key="g_c")
+            g_country = st.text_input("Country", "India", key="g_co")
         st.markdown("---")
         pro_mode = st.toggle("✨ Generate Full Horoscopes (Pro Feature)")
     else:
@@ -752,8 +754,8 @@ with tabs[0]:
                 b_mars_result, g_mars_result = ("Skipped", "No Data"), ("Skipped", "No Data")
                 
                 if input_method == "Birth Details":
-                    b_moon, b_mars_l, _, _, b_chart, b_d9 = get_planetary_positions(b_date, b_time, b_city, "India", detailed=pro_mode)
-                    g_moon, g_mars_l, _, _, g_chart, g_d9 = get_planetary_positions(g_date, g_time, g_city, "India", detailed=pro_mode)
+                    b_moon, b_mars_l, _, _, b_chart, b_d9 = get_planetary_positions(b_date, b_time, b_city, b_country, detailed=pro_mode)
+                    g_moon, g_mars_l, _, _, g_chart, g_d9 = get_planetary_positions(g_date, g_time, g_city, g_country, detailed=pro_mode)
                     b_nak, b_rashi, b_pada = get_nak_rashi_pada(b_moon)
                     g_nak, g_rashi, g_pada = get_nak_rashi_pada(g_moon)
                     
@@ -774,6 +776,9 @@ with tabs[0]:
                     g_d9_rashi = get_d9_rashi_from_pada(g_nak, g_pada_sel)
                     
                     b_mars = (False, "Unknown"); g_mars = (False, "Unknown")
+                    # For display in report (direct mode)
+                    b_pada = b_pada_sel
+                    g_pada = g_pada_sel
 
                 score, breakdown, logs, rajju, vedha, safety_override = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
                 raw_score = sum(row[1] for row in breakdown)
@@ -784,10 +789,16 @@ with tabs[0]:
                     g_obs = analyze_aspects_and_occupation_rich(g_planets, g_rashi)
                 
                 human_verdict = generate_human_verdict(score, rajju, b_obs, g_obs, f"{b_dasha_name} ({b_dasha_tone})", f"{g_dasha_name} ({g_dasha_tone})")
+                
+                # Store friendly names
+                b_rashi_name = RASHIS[b_rashi].split(" ")[0]
+                g_rashi_name = RASHIS[g_rashi].split(" ")[0]
 
                 st.session_state.results = {
                     "score": score, "raw_score": raw_score, "bd": breakdown, "logs": logs, 
                     "b_n": NAKSHATRAS[b_nak], "g_n": NAKSHATRAS[g_nak],
+                    "b_info": f"{NAKSHATRAS[b_nak]} ({b_rashi_name}, Pada {b_pada})",
+                    "g_info": f"{NAKSHATRAS[g_nak]} ({g_rashi_name}, Pada {g_pada})",
                     "b_mars": b_mars_result, "g_mars": g_mars_result,
                     "rajju": rajju, "vedha": vedha,
                     "b_planets": b_planets, "g_planets": g_planets,
@@ -849,7 +860,7 @@ with tabs[0]:
         </div>
         """, unsafe_allow_html=True)
 
-        share_text = f"Match Report: {res['b_n']} w/ {res['g_n']}. Score: {res['score']}/36. {status}"
+        share_text = f"Match Report: {res['b_info']} w/ {res['g_info']}. Score: {res['score']}/36. {status}"
         st.code(share_text, language="text")
         st.caption("👆 Copy to share on WhatsApp")
         
