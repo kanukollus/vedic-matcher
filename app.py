@@ -220,7 +220,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v111_countries_and_report", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v112_final_defaults", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -723,7 +723,7 @@ with tabs[0]:
         with c2:
             st.markdown("### 👰 Girl")
             g_date = st.date_input("Date", datetime.date(1994,11,28), key="g_d")
-            g_time = st.time_input("Time", datetime.time(7,30), step=60, key="g_t")
+            g_time = st.time_input("Time", datetime.time(7,35), step=60, key="g_t")
             g_city = st.text_input("City", "Hyderabad", key="g_c")
             g_country = st.text_input("Country", "India", key="g_co")
         st.markdown("---")
@@ -742,7 +742,7 @@ with tabs[0]:
             try: g_def_idx = next(i for i, r in enumerate(g_rashi_opts) if "Virgo" in r)
             except StopIteration: g_def_idx = 0
             g_rashi_sel = st.selectbox("Girl Rashi", g_rashi_opts, index=g_def_idx, key="g_r")
-            g_pada_sel = st.selectbox("Girl Pada", [1, 2, 3, 4], index=3, key="g_p")
+            g_pada_sel = st.selectbox("Girl Pada", [1, 2, 3, 4], index=2, key="g_p")
 
     if st.button("Check Compatibility", type="primary", use_container_width=True):
         try:
@@ -953,12 +953,20 @@ with tabs[1]:
     
     col_f1, col_f2 = st.columns(2)
     with col_f1: 
-        finder_gender = st.selectbox("I am a", ["Boy", "Girl"])
-        finder_star = st.selectbox("My Star", NAKSHATRAS)
-        finder_pada = st.selectbox("My Pada", [1, 2, 3, 4], index=3, key="f_p") # Default to 4
+        finder_gender = st.selectbox("I am a", ["Boy", "Girl"], index=1)
+        finder_star = st.selectbox("My Star", NAKSHATRAS, index=11)
+        finder_pada = st.selectbox("My Pada", [1, 2, 3, 4], index=2, key="f_p") # Default to 3 (Index 2)
     with col_f2: 
         finder_rashi_opts = [RASHIS[i] for i in NAK_TO_RASHI_MAP[NAKSHATRAS.index(finder_star)]]
-        finder_rashi = st.selectbox("My Rashi", finder_rashi_opts)
+        
+        # Auto-select Virgo (Kanya) if available, else first
+        def_rashi_index = 0
+        for i, r in enumerate(finder_rashi_opts):
+            if "Virgo" in r:
+                def_rashi_index = i
+                break
+                
+        finder_rashi = st.selectbox("My Rashi", finder_rashi_opts, index=def_rashi_index)
         
     if st.button("Find Best Matches", type="primary"):
         with st.spinner("Scanning..."):
