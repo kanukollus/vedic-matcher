@@ -214,7 +214,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v106_contrast_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v107_html_indent_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -956,27 +956,21 @@ with tabs[1]:
                 share_txt = f"I matched my star ({finder_star}) and found the best match is {top_match['Match Details']} with a score of {top_match['Final Remedied Score']}/36!"
                 st.code(share_txt, language="text"); st.caption("👆 Copy top result for WhatsApp")
             
-            # Prepare Clean Table with Custom HTML
+            # Prepare Clean Table with Custom HTML (FIXED INDENTATION FOR STREAMLIT)
             if filtered_matches:
-                table_html = """
-                <table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px;">
-                    <thead>
-                        <tr style="background-color: #f0f2f6; color: #333333; border-bottom: 2px solid #ccc;">
-                            <th style="padding: 10px; text-align: left; width: 60%;">Match Details</th>
-                            <th style="padding: 10px; text-align: center; width: 20%;">Raw<br>Score</th>
-                            <th style="padding: 10px; text-align: center; width: 20%;">Remedied<br>Score</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                """
+                table_html = "<table style='width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px;'>"
+                table_html += "<thead><tr style='background-color: #f0f2f6; color: #333333; border-bottom: 2px solid #ccc;'>"
+                table_html += "<th style='padding: 10px; text-align: left; width: 60%;'>Match Details</th>"
+                table_html += "<th style='padding: 10px; text-align: center; width: 20%;'>Raw<br>Score</th>"
+                table_html += "<th style='padding: 10px; text-align: center; width: 20%;'>Remedied<br>Score</th></tr></thead>"
+                table_html += "<tbody>"
+                
                 for m in filtered_matches:
-                    table_html += f"""
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 10px; text-align: left; word-wrap: break-word;">{m['Match Details']}</td>
-                            <td style="padding: 10px; text-align: center;">{m['Raw Score']}</td>
-                            <td style="padding: 10px; text-align: center; font-weight: bold;">{m['Final Remedied Score']}</td>
-                        </tr>
-                    """
+                    table_html += f"<tr style='border-bottom: 1px solid #eee;'>"
+                    table_html += f"<td style='padding: 10px; text-align: left; word-wrap: break-word;'>{m['Match Details']}</td>"
+                    table_html += f"<td style='padding: 10px; text-align: center;'>{m['Raw Score']}</td>"
+                    table_html += f"<td style='padding: 10px; text-align: center; font-weight: bold;'>{m['Final Remedied Score']}</td></tr>"
+                
                 table_html += "</tbody></table>"
                 st.markdown(table_html, unsafe_allow_html=True)
             else:
