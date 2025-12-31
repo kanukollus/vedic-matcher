@@ -214,7 +214,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v101_critical_check", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v102_risky_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -613,14 +613,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         vedha_status = "Fail"
     
     # CRITICAL SAFETY CHECK
-    # Check if Nadi AND Bhakoot are BOTH 0. If so, override score to 0 or flag as dangerous.
-    # The sum logic above adds them. Let's inspect 'breakdown' to be sure.
-    # Indices in breakdown tuples: 0=Name, 1=Raw, 2=Final
-    # Bhakoot is index 6 (7th item), Nadi is index 7 (8th item) in current flow
-    # But safer to check names.
-    
-    bhakoot_score = 0
-    nadi_score = 0
+    bhakoot_score = 0; nadi_score = 0
     for item in bd:
         if item[0] == "Bhakoot": bhakoot_score = item[2]
         if item[0] == "Nadi": nadi_score = item[2]
@@ -644,21 +637,33 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
             valid_rashis = NAK_TO_RASHI_MAP[i]
             for t_rashi_idx in valid_rashis:
                 t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
-                if source_gender == "Boy": score, bd, logs, _, _, _ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
-                else: score, bd, logs, _, _, _ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+                if source_gender == "Boy": score, bd, logs, _, _, safety = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
+                else: score, bd, logs, _, _, safety = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
                 
+                # Check for Safe vs Risky
+                is_risky = (safety == "Risky Match ❌")
+                
+                # Logic to capture best score, prioritizing Safe matches
                 if score > best_score_for_star:
                     best_score_for_star = score
-                    best_padas = [t_pada]
+                    best_padas = [t_pada] # Reset list
                     raw_score = sum(item[1] for item in bd)
                     reason = logs[0]['Fix'] if logs else "Standard Match"
                     if score == 36: reason = "Perfect Match!"
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Reason": reason}
+                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Reason": reason, "IsRisky": is_risky}
+                
                 elif score == best_score_for_star:
-                    best_padas.append(t_pada)
+                    # Tie-breaker: If current best is Risky, but new one is Safe -> Overwrite
+                    if best_details.get("IsRisky") and not is_risky:
+                        best_padas = [t_pada] # Reset list with safe one
+                        best_details['IsRisky'] = False # Now it's safe
+                    # If both are safe (or both risky), append the pada
+                    elif best_details.get("IsRisky") == is_risky:
+                        best_padas.append(t_pada)
 
         if best_details: 
-            best_details['Notes'] = f"{best_details['Reason']} (Padas: {', '.join(map(str, best_padas))})"
+            risk_prefix = "⚠️ Risky (Zero Nadi+Bhakoot) " if best_details['IsRisky'] else ""
+            best_details['Notes'] = f"{risk_prefix}{best_details['Reason']} (Padas: {', '.join(map(str, best_padas))})"
             matches.append(best_details)
             
     return sorted(matches, key=lambda x: x['Final Remedied Score'], reverse=True)
