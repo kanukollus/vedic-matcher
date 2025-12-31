@@ -214,7 +214,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v104_html_tables", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v105_html_fix", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -433,10 +433,17 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     else: verdict += "Mathematically, the compatibility score is on the lower side."
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
-    verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
-    if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
-        verdict += "Since both are running similar intense periods, mutual patience is key."
-    else: verdict += "These periods complement each other well for growth."
+    
+    # Handle missing dasha gracefully
+    if "Unknown" in b_dasha:
+        verdict += "\n\n**Time Cycles:** Skipped (Requires full birth details for Dasha calculation)."
+    else:
+        verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
+        if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
+            verdict += "Since both are running similar intense periods, mutual patience is key."
+        else:
+            verdict += "These periods complement each other well for growth."
+    
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -646,9 +653,7 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
                     best_score_for_star = score
                     best_padas = [t_pada] # Reset list
                     raw_score = sum(item[1] for item in bd)
-                    reason = logs[0]['Fix'] if logs else "Standard Match"
-                    if score == 36: reason = "Perfect Match!"
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Reason": reason, "IsRisky": is_risky}
+                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "IsRisky": is_risky}
                 
                 elif score == best_score_for_star:
                     if best_details.get("IsRisky") and not is_risky:
@@ -658,13 +663,11 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
                         best_padas.append(t_pada)
 
         if best_details: 
-            # Format Padas
             unique_padas = sorted(list(set(best_padas)))
             pada_str = ", ".join(map(str, unique_padas))
-            
-            # Format Match Details string
             rashi_simple = best_details['Rashi'].split(" ")[0]
-            best_details['Match Details'] = f"{best_details['Star']} ({rashi_simple}) (Padas: {pada_str})"
+            risk_icon = "⚠️" if best_details['IsRisky'] else ""
+            best_details['Match Details'] = f"{risk_icon} {best_details['Star']} ({rashi_simple}) (Padas: {pada_str})"
             matches.append(best_details)
             
     return sorted(matches, key=lambda x: x['Final Remedied Score'], reverse=True)
@@ -955,25 +958,9 @@ with tabs[1]:
             
             # Prepare Clean Table with Custom HTML
             if filtered_matches:
-                table_html = """
-                <table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px;">
-                    <thead>
-                        <tr style="background-color: #f0f2f6; border-bottom: 2px solid #ccc;">
-                            <th style="padding: 10px; text-align: left; width: 60%;">Match Details</th>
-                            <th style="padding: 10px; text-align: center; width: 20%;">Raw<br>Score</th>
-                            <th style="padding: 10px; text-align: center; width: 20%;">Remedied<br>Score</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                """
+                table_html = """<table style="width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px;"><thead><tr style="background-color: #f0f2f6; border-bottom: 2px solid #ccc;"><th style="padding: 10px; text-align: left; width: 60%;">Match Details</th><th style="padding: 10px; text-align: center; width: 20%;">Raw<br>Score</th><th style="padding: 10px; text-align: center; width: 20%;">Remedied<br>Score</th></tr></thead><tbody>"""
                 for m in filtered_matches:
-                    table_html += f"""
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 10px; text-align: left; word-wrap: break-word;">{m['Match Details']}</td>
-                            <td style="padding: 10px; text-align: center;">{m['Raw Score']}</td>
-                            <td style="padding: 10px; text-align: center; font-weight: bold;">{m['Final Remedied Score']}</td>
-                        </tr>
-                    """
+                    table_html += f"""<tr style="border-bottom: 1px solid #eee;"><td style="padding: 10px; text-align: left; word-wrap: break-word;">{m['Match Details']}</td><td style="padding: 10px; text-align: center;">{m['Raw Score']}</td><td style="padding: 10px; text-align: center; font-weight: bold;">{m['Final Remedied Score']}</td></tr>"""
                 table_html += "</tbody></table>"
                 st.markdown(table_html, unsafe_allow_html=True)
             else:
