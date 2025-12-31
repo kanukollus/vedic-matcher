@@ -15,9 +15,16 @@ from io import BytesIO
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="wide")
 
-# --- 2. CSS STYLING ---
+# --- 2. CSS STYLING (UPDATED TO HIDE TOOLBAR) ---
 st.markdown("""
 <style>
+    /* HIDE STREAMLIT UI ELEMENTS */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
+    
+    /* APP STYLING */
     .guna-card { background-color: #f0f2f6; color: #31333F; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid #ccc; }
     .guna-header { font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; color: #31333F; }
     .guna-score { font-weight: bold; }
