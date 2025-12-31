@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import time
 from fpdf import FPDF
+from io import BytesIO
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(page_title="Vedic Matcher Pro", page_icon="🕉️", layout="wide")
@@ -155,6 +156,11 @@ def predict_marriage_luck_years(rashi_idx):
 
 def predict_wedding_month(rashi_idx): return SUN_TRANSIT_DATES[(rashi_idx + 6) % 12]
 
+def to_csv(df):
+    output = BytesIO()
+    df.to_csv(output, index=False)
+    return output.getvalue()
+
 # --- PDF GENERATOR ---
 class PDFReport(FPDF):
     def header(self):
@@ -214,7 +220,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v107_html_indent_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v108_export_features", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -433,17 +439,10 @@ def generate_human_verdict(score, rajju, b_obs, g_obs, b_dasha, g_dasha):
     else: verdict += "Mathematically, the compatibility score is on the lower side."
     if rajju == "Fail": verdict += " **Rajju Dosha** suggests paying attention to health/physical compatibility."
     elif rajju == "Cancelled": verdict += " Critical Doshas are effectively **cancelled**."
-    
-    # Handle missing dasha gracefully
-    if "Unknown" in b_dasha:
-        verdict += "\n\n**Time Cycles:** Skipped (Requires full birth details for Dasha calculation)."
-    else:
-        verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
-        if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
-            verdict += "Since both are running similar intense periods, mutual patience is key."
-        else:
-            verdict += "These periods complement each other well for growth."
-    
+    verdict += f"\n\n**Time Cycles:** The boy is in a period of *{b_dasha}* and the girl is in *{g_dasha}*. "
+    if b_dasha == g_dasha and b_dasha in ["Rahu", "Ketu", "Saturn"]:
+        verdict += "Since both are running similar intense periods, mutual patience is key."
+    else: verdict += "These periods complement each other well for growth."
     verdict += "\n\n**Planetary Influence:** "
     if any("Aspect" in o for o in b_obs + g_obs):
         verdict += "Planetary aspects on the marriage house indicate a relationship that will mature beautifully with time."
@@ -666,6 +665,7 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
             unique_padas = sorted(list(set(best_padas)))
             pada_str = ", ".join(map(str, unique_padas))
             rashi_simple = best_details['Rashi'].split(" ")[0]
+            # Formatted Match Details
             risk_icon = "⚠️" if best_details['IsRisky'] else ""
             best_details['Match Details'] = f"{risk_icon} {best_details['Star']} ({rashi_simple}) (Padas: {pada_str})"
             matches.append(best_details)
@@ -926,8 +926,12 @@ with tabs[0]:
 with tabs[1]:
     st.header("🔍 Match Finder"); st.caption("Find the best compatible stars for you.")
     
-    # Toggle for Risky Matches
-    show_risky = st.checkbox("Show Risky Matches (Caution!)", value=False)
+    # Sort Controls
+    c_sort1, c_sort2 = st.columns(2)
+    with c_sort1:
+        show_risky = st.checkbox("Show Risky Matches (Caution!)", value=False)
+    with c_sort2:
+        sort_order = st.radio("Sort Results By:", ["Remedied Score (Highest First)", "Raw Score (Lowest First)", "Raw Score (Highest First)"], index=1, horizontal=True)
     
     col_f1, col_f2 = st.columns(2)
     with col_f1: 
@@ -948,15 +952,29 @@ with tabs[1]:
                 if m['IsRisky'] and not show_risky:
                     continue # Skip risky unless toggle is on
                 filtered_matches.append(m)
+            
+            # Apply Sorting
+            if sort_order == "Raw Score (Lowest First)":
+                filtered_matches = sorted(filtered_matches, key=lambda x: x['Raw Score'])
+            elif sort_order == "Raw Score (Highest First)":
+                filtered_matches = sorted(filtered_matches, key=lambda x: x['Raw Score'], reverse=True)
+            else: # Remedied Score (Highest First) - Default
+                filtered_matches = sorted(filtered_matches, key=lambda x: x['Final Remedied Score'], reverse=True)
                 
             st.success(f"Found {len(filtered_matches)} combinations!"); st.markdown("### Top Matches")
-            if filtered_matches:
-                top_match = filtered_matches[0]
-                # Format text for sharing
-                share_txt = f"I matched my star ({finder_star}) and found the best match is {top_match['Match Details']} with a score of {top_match['Final Remedied Score']}/36!"
-                st.code(share_txt, language="text"); st.caption("👆 Copy top result for WhatsApp")
             
-            # Prepare Clean Table with Custom HTML (FIXED INDENTATION FOR STREAMLIT)
+            # Export CSV
+            if filtered_matches:
+                df_export = pd.DataFrame(filtered_matches)
+                csv_data = to_csv(df_export)
+                st.download_button(label="📥 Download Results as CSV", data=csv_data, file_name="match_results.csv", mime="text/csv")
+                
+                # WhatsApp Share Text
+                top_match = filtered_matches[0]
+                share_txt = f"*Best Match Found:* {top_match['Match Details']}\n*Score:* {top_match['Final Remedied Score']}/36\n(Raw: {top_match['Raw Score']})"
+                st.text_area("📋 Copy for WhatsApp:", value=share_txt, height=100)
+
+            # Render Table
             if filtered_matches:
                 table_html = "<table style='width:100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px;'>"
                 table_html += "<thead><tr style='background-color: #f0f2f6; color: #333333; border-bottom: 2px solid #ccc;'>"
@@ -966,7 +984,9 @@ with tabs[1]:
                 table_html += "<tbody>"
                 
                 for m in filtered_matches:
-                    table_html += f"<tr style='border-bottom: 1px solid #eee;'>"
+                    # Row Color for Risk
+                    bg_style = "background-color: #ffe6e6;" if m['IsRisky'] else ""
+                    table_html += f"<tr style='border-bottom: 1px solid #eee; {bg_style}'>"
                     table_html += f"<td style='padding: 10px; text-align: left; word-wrap: break-word;'>{m['Match Details']}</td>"
                     table_html += f"<td style='padding: 10px; text-align: center;'>{m['Raw Score']}</td>"
                     table_html += f"<td style='padding: 10px; text-align: center; font-weight: bold;'>{m['Final Remedied Score']}</td></tr>"
