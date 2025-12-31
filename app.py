@@ -92,7 +92,6 @@ DASHA_ORDER = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Satur
 DASHA_YEARS = {"Ketu": 7, "Venus": 20, "Sun": 6, "Moon": 10, "Mars": 7, "Rahu": 18, "Jupiter": 16, "Saturn": 19, "Mercury": 17}
 SPECIAL_ASPECTS = {"Mars": [4, 7, 8], "Jupiter": [5, 7, 9], "Saturn": [3, 7, 10], "Rahu": [5, 7, 9], "Ketu": [5, 7, 9]}
 SUN_TRANSIT_DATES = {0: "Apr 14 - May 14", 1: "May 15 - Jun 14", 2: "Jun 15 - Jul 15", 3: "Jul 16 - Aug 16", 4: "Aug 17 - Sep 16", 5: "Sep 17 - Oct 16", 6: "Oct 17 - Nov 15", 7: "Nov 16 - Dec 15", 8: "Dec 16 - Jan 13", 9: "Jan 14 - Feb 12", 10: "Feb 13 - Mar 13", 11: "Mar 14 - Apr 13"}
-NAK_TRAITS = {0: {"Trait": "Pioneer"}, 1: {"Trait": "Creative"}, 2: {"Trait": "Sharp"}, 3: {"Trait": "Sensual"}, 4: {"Trait": "Curious"}, 5: {"Trait": "Intellectual"}, 6: {"Trait": "Nurturing"}, 7: {"Trait": "Spiritual"}, 8: {"Trait": "Mystical"}, 9: {"Trait": "Royal"}, 10: {"Trait": "Social"}, 11: {"Trait": "Charitable"}, 12: {"Trait": "Skilled"}, 13: {"Trait": "Beautiful"}, 14: {"Trait": "Independent"}, 15: {"Trait": "Focused"}, 16: {"Trait": "Friendship"}, 17: {"Trait": "Protective"}, 18: {"Trait": "Deep"}, 19: {"Trait": "Invincible"}, 20: {"Trait": "Victory"}, 21: {"Trait": "Listener"}, 22: {"Trait": "Musical"}, 23: {"Trait": "Healer"}, 24: {"Trait": "Passionate"}, 25: {"Trait": "Ascetic"}, 26: {"Trait": "Complete"}}
 SYNERGY_MEANINGS = {
     "Sun": "Aligned Egos. You shine in similar ways and understand each other's pride.",
     "Moon": "Deep Empathy. You intuitively understand each other's moods and needs.",
@@ -214,7 +213,7 @@ def generate_pdf(res):
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 @st.cache_resource
-def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v102_risky_fix", timeout=10)
+def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v103_final", timeout=10)
 @st.cache_resource
 def get_tf(): return TimezoneFinder()
 @st.cache_data(ttl=3600)
@@ -626,45 +625,91 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     matches = []
-    s_d9_rashi = get_d9_rashi_from_pada(s_nak, s_pada)
+    # No s_d9_rashi needed here, calculated inside loop
+    
     for i in range(27): 
         target_star_name = NAKSHATRAS[i]
-        best_score_for_star = -1
-        best_details = {}
-        best_padas = [] 
         
+        # We need to find the BEST score for this star across 4 padas
+        # And group the padas that give that best score
+        best_score_for_star = -1
+        best_padas = [] 
+        best_details_for_star = None
+        
+        # Iterate 4 padas
         for t_pada in range(1, 5):
             valid_rashis = NAK_TO_RASHI_MAP[i]
-            for t_rashi_idx in valid_rashis:
-                t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
-                if source_gender == "Boy": score, bd, logs, _, _, safety = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
-                else: score, bd, logs, _, _, safety = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
-                
-                # Check for Safe vs Risky
-                is_risky = (safety == "Risky Match ❌")
-                
-                # Logic to capture best score, prioritizing Safe matches
-                if score > best_score_for_star:
-                    best_score_for_star = score
-                    best_padas = [t_pada] # Reset list
-                    raw_score = sum(item[1] for item in bd)
-                    reason = logs[0]['Fix'] if logs else "Standard Match"
-                    if score == 36: reason = "Perfect Match!"
-                    best_details = {"Star": target_star_name, "Rashi": RASHIS[t_rashi_idx], "Final Remedied Score": score, "Raw Score": raw_score, "Reason": reason, "IsRisky": is_risky}
-                
-                elif score == best_score_for_star:
-                    # Tie-breaker: If current best is Risky, but new one is Safe -> Overwrite
-                    if best_details.get("IsRisky") and not is_risky:
-                        best_padas = [t_pada] # Reset list with safe one
-                        best_details['IsRisky'] = False # Now it's safe
-                    # If both are safe (or both risky), append the pada
-                    elif best_details.get("IsRisky") == is_risky:
-                        best_padas.append(t_pada)
+            # Some stars span 2 rashis. We need correct rashi for the pada.
+            # get_nak_rashi_pada inverse logic needed? 
+            # Actually simplest way:
+            # We know Star and Pada. We can find exact Rashi.
+            # Each star has 4 padas.
+            # Star 0: P1->Ari, P2->Ari, P3->Ari, P4->Ari
+            # Star 2 (Krittika): P1->Ari, P2->Tau, P3->Tau, P4->Tau
+            
+            # Global longitude of Star start
+            star_span = 13.3333333333333
+            pada_span = 3.3333333333333
+            
+            star_start_deg = i * star_span
+            pada_start_deg = star_start_deg + (t_pada - 1) * pada_span
+            mid_pada_deg = pada_start_deg + 1.0 # Pick a point inside
+            
+            # Find rashi of this point
+            t_rashi_idx = int(mid_pada_deg / 30)
+            
+            # Calculate D9
+            t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
+            
+            # Source D9
+            s_d9_rashi = get_d9_rashi_from_pada(s_nak, s_pada)
 
-        if best_details: 
-            risk_prefix = "⚠️ Risky (Zero Nadi+Bhakoot) " if best_details['IsRisky'] else ""
-            best_details['Notes'] = f"{risk_prefix}{best_details['Reason']} (Padas: {', '.join(map(str, best_padas))})"
-            matches.append(best_details)
+            if source_gender == "Boy": 
+                score, bd, logs, _, _, safety = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
+            else: 
+                score, bd, logs, _, _, safety = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+            
+            is_risky = (safety == "Risky Match ❌")
+            
+            # Tracking logic
+            if score > best_score_for_star:
+                best_score_for_star = score
+                best_padas = [t_pada] # New best found, reset list
+                
+                raw_score = sum(item[1] for item in bd)
+                best_details_for_star = {
+                    "StarBase": target_star_name,
+                    "Rashi": RASHIS[t_rashi_idx].split(" ")[0], # Just Name
+                    "Final Remedied Score": score,
+                    "Raw Score": raw_score,
+                    "IsRisky": is_risky
+                }
+            elif score == best_score_for_star:
+                # If score matches, check safety
+                # If currently stored is risky, but new one is safe -> Replace
+                if best_details_for_star and best_details_for_star['IsRisky'] and not is_risky:
+                     best_padas = [t_pada]
+                     best_details_for_star['IsRisky'] = False # Upgrade to safe
+                # If both safe or both risky, add to list
+                elif best_details_for_star and (best_details_for_star['IsRisky'] == is_risky):
+                    best_padas.append(t_pada)
+        
+        # End of Padas loop for this Star
+        if best_details_for_star:
+            # Sort and deduplicate padas
+            unique_padas = sorted(list(set(best_padas)))
+            pada_str = ", ".join(map(str, unique_padas))
+            
+            # Create Final Display Name
+            # "Ashwini (Aries) (Padas: 1, 4)"
+            disp_name = f"{best_details_for_star['StarBase']} ({best_details_for_star['Rashi']}) (Padas: {pada_str})"
+            
+            best_details_for_star['Match Details'] = disp_name
+            # Remove helper keys not needed for display
+            del best_details_for_star['StarBase']
+            del best_details_for_star['Rashi']
+            
+            matches.append(best_details_for_star)
             
     return sorted(matches, key=lambda x: x['Final Remedied Score'], reverse=True)
 
@@ -921,6 +966,10 @@ with tabs[0]:
 # --- OTHER TABS ---
 with tabs[1]:
     st.header("🔍 Match Finder"); st.caption("Find the best compatible stars for you.")
+    
+    # Toggle for Risky Matches
+    show_risky = st.checkbox("Show Risky Matches (Caution!)", value=False)
+    
     col_f1, col_f2 = st.columns(2)
     with col_f1: 
         finder_gender = st.selectbox("I am a", ["Boy", "Girl"])
@@ -933,13 +982,29 @@ with tabs[1]:
     if st.button("Find Best Matches", type="primary"):
         with st.spinner("Scanning..."):
             matches = find_best_matches(finder_gender, NAKSHATRAS.index(finder_star), RASHIS.index(finder_rashi), finder_pada)
-            st.success(f"Found {len(matches)} combinations!"); st.markdown("### Top Matches")
-            if matches:
-                top_match = matches[0]
-                share_txt = f"I matched my star ({finder_star}) and found the best match is {top_match['Star']} ({top_match['Rashi']}) with a score of {top_match['Final Remedied Score']}/36!"
+            
+            # Filter Risky Matches Logic
+            filtered_matches = []
+            for m in matches:
+                if m['IsRisky'] and not show_risky:
+                    continue # Skip risky unless toggle is on
+                filtered_matches.append(m)
+                
+            st.success(f"Found {len(filtered_matches)} combinations!"); st.markdown("### Top Matches")
+            if filtered_matches:
+                top_match = filtered_matches[0]
+                # Format text for sharing
+                share_txt = f"I matched my star ({finder_star}) and found the best match is {top_match['Match Details']} with a score of {top_match['Final Remedied Score']}/36!"
                 st.code(share_txt, language="text"); st.caption("👆 Copy top result for WhatsApp")
-            df_m = pd.DataFrame(matches); df_m['Rating'] = df_m['Final Remedied Score'].apply(lambda x: "⭐⭐⭐" if x > 25 else ("⭐⭐" if x > 18 else "⭐"))
-            st.dataframe(df_m, use_container_width=True, hide_index=True)
+            
+            # Prepare Clean Table
+            if filtered_matches:
+                df_m = pd.DataFrame(filtered_matches)
+                # Keep only specific columns
+                df_clean = df_m[["Match Details", "Final Remedied Score", "Raw Score"]]
+                st.dataframe(df_clean, use_container_width=True, hide_index=True)
+            else:
+                st.warning("No matches found with current filters. Try enabling 'Show Risky Matches'.")
 
 with tabs[2]:
     st.header("💍 Wedding Dates"); t_rashi = st.selectbox("Select Moon Sign (Rashi)", RASHIS, key="t_r")
