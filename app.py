@@ -223,30 +223,30 @@ class PDFReport(FPDF):
         self.multi_cell(0, 6, body)
         self.ln()
 
-   def koota_row(self, attr, score, max_pts, logic, area):
-    # Store current Y to draw shapes
-    current_y = self.get_y()
-    
-    # 1. Draw the Attribute & Area
-    self.set_text_color(50, 50, 50)
-    self.cell(40, 8, clean_text(attr), 1)
-    self.cell(35, 8, clean_text(area), 1)
-    
-    # 2. Draw the Score with a Background Color (The Visual Indicator)
-    percent = (score / max_pts) if max_pts > 0 else 0
-    if percent >= 0.8: self.set_fill_color(200, 255, 200) # Light Green
-    elif percent >= 0.5: self.set_fill_color(255, 240, 200) # Light Gold
-    else: self.set_fill_color(255, 200, 200) # Light Red
-    
-    self.cell(20, 8, f"{score}/{max_pts}", 1, 0, 'C', 1)
-    
-    # 3. Draw the Logic (Cleaned of Emojis)
-    self.set_text_color(50, 50, 50)
-    # Truncate logic to prevent overflow
-    safe_logic = clean_text(logic)
-    if len(safe_logic) > 55: safe_logic = safe_logic[:52] + "..."
-    self.cell(95, 8, safe_logic, 1)
-    self.ln()
+    def koota_row(self, attr, score, max_pts, logic, area):
+        # Store current Y to draw shapes
+        current_y = self.get_y()
+        
+        # 1. Draw the Attribute & Area
+        self.set_text_color(50, 50, 50)
+        self.cell(40, 8, clean_text(attr), 1)
+        self.cell(35, 8, clean_text(area), 1)
+        
+        # 2. Draw the Score with a Background Color (The Visual Indicator)
+        percent = (score / max_pts) if max_pts > 0 else 0
+        if percent >= 0.8: self.set_fill_color(200, 255, 200) # Light Green
+        elif percent >= 0.5: self.set_fill_color(255, 240, 200) # Light Gold
+        else: self.set_fill_color(255, 200, 200) # Light Red
+        
+        self.cell(20, 8, f"{score}/{max_pts}", 1, 0, 'C', 1)
+        
+        # 3. Draw the Logic (Cleaned of Emojis)
+        self.set_text_color(50, 50, 50)
+        # Truncate logic to prevent overflow
+        safe_logic = clean_text(logic)
+        if len(safe_logic) > 55: safe_logic = safe_logic[:52] + "..."
+        self.cell(95, 8, safe_logic, 1)
+        self.ln()
 
 def generate_pdf(res):
     pdf = PDFReport()
