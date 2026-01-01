@@ -116,9 +116,33 @@ SYNERGY_MEANINGS = {
 # --- 5. HELPER FUNCTIONS ---
 
 def clean_text(text):
-    if not isinstance(text, str): return str(text)
-    replacements = {"✅": "[PASS] ", "⚠️": "[WARN] ", "❌": "[FAIL] ", "🔥": "[HIGH ENERGY] ", "✨": "* ", "🔸": "> ", "🔗": "", "🤖": ""}
-    for k, v in replacements.items(): text = text.replace(k, v)
+    """
+    Replaces Unicode/Emojis with PDF-safe text equivalents.
+    Standard PDF fonts only support Latin-1 characters.
+    """
+    if not isinstance(text, str): 
+        return str(text)
+    
+    # Professional mapping for 2026 reports
+    replacements = {
+        "✅": "[PASS]", 
+        "⚠️": "[WARN]", 
+        "❌": "[FAIL]", 
+        "🔥": "[HIGH ENERGY]", 
+        "✨": "(*)", 
+        "🔸": "-", 
+        "🔗": "(Link)", 
+        "🤖": "AI:", 
+        "🕉️": "",
+        "\u2728": "*", # Sparkles
+        "\u2705": "[OK]", # Check mark
+        "\u26a0\ufe0f": "[!]" # Warning
+    }
+    
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+        
+    # Final safety: encode to latin-1 and ignore characters that can't be translated
     return text.encode('latin-1', 'replace').decode('latin-1')
 
 def format_chart_for_ai(chart_data):
@@ -251,9 +275,10 @@ def generate_pdf(res):
         pdf.rect(10, pdf.get_y(), 190, 35, 'F')
         pdf.chapter_title("2. Guru AI - Karmic Insight")
         pdf.set_font('Arial', 'I', 10)
-        pdf.multi_cell(0, 6, clean_text(st.session_state.ai_pitch))
+        cleaned_pitch = clean_text(st.session_state.ai_pitch) # This is where the error usually hits
+        pdf.multi_cell(0, 6, cleaned_pitch)
         pdf.ln(5)
-
+    
     # 3. ASHTA KOOTA ANALYSIS (Professional Table)
     pdf.chapter_title("3. Detailed Guna Analysis")
     pdf.set_font('Arial', 'B', 10)
