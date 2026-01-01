@@ -115,35 +115,36 @@ SYNERGY_MEANINGS = {
 
 # --- 5. HELPER FUNCTIONS ---
 
+import re
+
 def clean_text(text):
-    """
-    Replaces Unicode/Emojis with PDF-safe text equivalents.
-    Standard PDF fonts only support Latin-1 characters.
-    """
     if not isinstance(text, str): 
         return str(text)
     
-    # Professional mapping for 2026 reports
+    # 1. Map modern icons to professional PDF-safe labels
     replacements = {
-        "✅": "[PASS]", 
-        "⚠️": "[WARN]", 
-        "❌": "[FAIL]", 
-        "🔥": "[HIGH ENERGY]", 
-        "✨": "(*)", 
-        "🔸": "-", 
-        "🔗": "(Link)", 
-        "🤖": "AI:", 
-        "🕉️": "",
-        "\u2728": "*", # Sparkles
-        "\u2705": "[OK]", # Check mark
-        "\u26a0\ufe0f": "[!]" # Warning
+        "✅": "[PASS]", "✔️": "[PASS]",
+        "❌": "[FAIL]", "✖️": "[FAIL]",
+        "⚠️": "[WARN]", "❗": "[NOTE]",
+        "✨": "*", "⭐": "*", "\u2728": "*", 
+        "🔥": "[VIGOR]", "🛡️": "[PROTECTED]",
+        "🕉️": "OM", "🔗": "->",
+        "🤵": "Groom:", "👰": "Bride:",
+        "💍": "Wedding:", "🤖": "AI Insight:"
     }
     
-    for k, v in replacements.items():
-        text = text.replace(k, v)
-        
-    # Final safety: encode to latin-1 and ignore characters that can't be translated
-    return text.encode('latin-1', 'replace').decode('latin-1')
+    for emoji, label in replacements.items():
+        text = text.replace(emoji, label)
+    
+    # 2. Strip any remaining non-Latin-1 characters (Safety Net)
+    # This removes anything with a codepoint > 255
+    text = "".join(i if ord(i) < 256 else ' ' for i in text)
+    
+    # 3. Clean up whitespace
+    text = re.sub(' +', ' ', text)
+    
+    text = text.encode('ascii', 'ignore').decode('ascii') 
+    return text
 
 def format_chart_for_ai(chart_data):
     if not chart_data: return "Chart not generated."
@@ -222,19 +223,30 @@ class PDFReport(FPDF):
         self.multi_cell(0, 6, body)
         self.ln()
 
-    def koota_row(self, attr, score, max_pts, logic, area):
-        # Color logic for professional feel
-        percent = (score / max_pts) if max_pts > 0 else 0
-        if percent >= 0.8: self.set_text_color(0, 128, 0) # Green
-        elif percent >= 0.5: self.set_text_color(218, 165, 32) # Goldenrod
-        else: self.set_text_color(200, 0, 0) # Red
-        
-        self.cell(40, 8, clean_text(attr), 1)
-        self.cell(35, 8, clean_text(area), 1)
-        self.cell(20, 8, clean_text(f"{score}/{max_pts}"), 1, 0, 'C')
-        self.set_text_color(50, 50, 50)
-        self.cell(95, 8, clean_text(logic[:55] + '...' if len(logic) > 55 else logic), 1)
-        self.ln()
+   def koota_row(self, attr, score, max_pts, logic, area):
+    # Store current Y to draw shapes
+    current_y = self.get_y()
+    
+    # 1. Draw the Attribute & Area
+    self.set_text_color(50, 50, 50)
+    self.cell(40, 8, clean_text(attr), 1)
+    self.cell(35, 8, clean_text(area), 1)
+    
+    # 2. Draw the Score with a Background Color (The Visual Indicator)
+    percent = (score / max_pts) if max_pts > 0 else 0
+    if percent >= 0.8: self.set_fill_color(200, 255, 200) # Light Green
+    elif percent >= 0.5: self.set_fill_color(255, 240, 200) # Light Gold
+    else: self.set_fill_color(255, 200, 200) # Light Red
+    
+    self.cell(20, 8, f"{score}/{max_pts}", 1, 0, 'C', 1)
+    
+    # 3. Draw the Logic (Cleaned of Emojis)
+    self.set_text_color(50, 50, 50)
+    # Truncate logic to prevent overflow
+    safe_logic = clean_text(logic)
+    if len(safe_logic) > 55: safe_logic = safe_logic[:52] + "..."
+    self.cell(95, 8, safe_logic, 1)
+    self.ln()
 
 def generate_pdf(res):
     pdf = PDFReport()
@@ -270,14 +282,29 @@ def generate_pdf(res):
     pdf.ln(5)
 
     # 2. AI KARMIC INSIGHTS
+    # 2. AI KARMIC INSIGHTS (Dynamic & Safe)
     if st.session_state.ai_pitch:
-        pdf.set_fill_color(245, 245, 255)
-        pdf.rect(10, pdf.get_y(), 190, 35, 'F')
+        # Step 1: Force-Clean the AI content to strictly Latin-1
+        # We use a double-pass to ensure no 'sparkles' or high-unicode symbols survive
+        raw_pitch = st.session_state.ai_pitch
+        cleaned_pitch = clean_text(raw_pitch)
+        
+        # Step 2: Calculate dynamic height (Professional touch for 2026)
+        # This prevents the text from overflowing the colored background box
+        num_lines = len(pdf.multi_cell(0, 6, cleaned_pitch, split_only=True))
+        box_height = (num_lines * 6) + 15 # Padding for title and margins
+
+        # Step 3: Draw the shaded background
+        pdf.set_fill_color(245, 245, 255) # Soft Lavender/Blue
+        pdf.rect(10, pdf.get_y(), 190, box_height, 'F')
+        
+        # Step 4: Render Content
         pdf.chapter_title("2. Guru AI - Karmic Insight")
         pdf.set_font('Arial', 'I', 10)
-        cleaned_pitch = clean_text(st.session_state.ai_pitch) # This is where the error usually hits
+        pdf.set_text_color(40, 40, 80) # Darker blue for readability
         pdf.multi_cell(0, 6, cleaned_pitch)
-        pdf.ln(5)
+        pdf.ln(8) # Space after the box
+    
     
     # 3. ASHTA KOOTA ANALYSIS (Professional Table)
     pdf.chapter_title("3. Detailed Guna Analysis")
