@@ -121,30 +121,19 @@ def clean_text(text):
     if not isinstance(text, str): 
         return str(text)
     
-    # 1. Map modern icons to professional PDF-safe labels
+    # 1. Map common AI/Vedic symbols to PDF-safe text
     replacements = {
-        "✅": "[PASS]", "✔️": "[PASS]",
-        "❌": "[FAIL]", "✖️": "[FAIL]",
-        "⚠️": "[WARN]", "❗": "[NOTE]",
-        "✨": "*", "⭐": "*", "\u2728": "*", 
-        "🔥": "[VIGOR]", "🛡️": "[PROTECTED]",
-        "🕉️": "OM", "🔗": "->",
-        "🤵": "Groom:", "👰": "Bride:",
-        "💍": "Wedding:", "🤖": "AI Insight:"
+        "✨": "*", "⭐": "*", "✅": "[PASS]", "❌": "[FAIL]", 
+        "⚠️": "[WARN]", "🔥": "[ENERGY]", "🛡️": "[SHIELD]",
+        "💍": "[MARRIAGE]", "🤖": "AI:", "🕉️": "OM"
     }
-    
-    for emoji, label in replacements.items():
-        text = text.replace(emoji, label)
-    
-    # 2. Strip any remaining non-Latin-1 characters (Safety Net)
-    # This removes anything with a codepoint > 255
-    text = "".join(i if ord(i) < 256 else ' ' for i in text)
-    
-    # 3. Clean up whitespace
-    text = re.sub(' +', ' ', text)
-    
-    text = text.encode('ascii', 'ignore').decode('ascii') 
-    return text
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+        
+    # 2. Force-Convert to ASCII/Latin-1
+    # 'ignore' will strip any character that cannot be encoded (like \u2728)
+    # ensuring the PDF never crashes.
+    return text.encode('ascii', 'ignore').decode('ascii')
 
 def format_chart_for_ai(chart_data):
     if not chart_data: return "Chart not generated."
@@ -283,27 +272,33 @@ def generate_pdf(res):
 
     # 2. AI KARMIC INSIGHTS
     # 2. AI KARMIC INSIGHTS (Dynamic & Safe)
+    # 2. GURU AI - KARMIC INSIGHTS (Dynamic & Crash-Proof)
     if st.session_state.ai_pitch:
-        # Step 1: Force-Clean the AI content to strictly Latin-1
-        # We use a double-pass to ensure no 'sparkles' or high-unicode symbols survive
-        raw_pitch = st.session_state.ai_pitch
-        cleaned_pitch = clean_text(raw_pitch)
+        # Step 1: Sanitize the text immediately
+        cleaned_pitch = clean_text(st.session_state.ai_pitch)
         
-        # Step 2: Calculate dynamic height (Professional touch for 2026)
-        # This prevents the text from overflowing the colored background box
-        num_lines = len(pdf.multi_cell(0, 6, cleaned_pitch, split_only=True))
-        box_height = (num_lines * 6) + 15 # Padding for title and margins
+        # Step 2: Calculate how many lines this text will take at 10pt font
+        # split_only=True is a specific FPDF feature to measure text height
+        lines = pdf.multi_cell(180, 6, cleaned_pitch, split_only=True)
+        # 6 is the line height; 15 is the buffer for the header and margins
+        box_height = (len(lines) * 6) + 15 
 
-        # Step 3: Draw the shaded background
-        pdf.set_fill_color(245, 245, 255) # Soft Lavender/Blue
+        # Step 3: Draw the professional shaded background box
+        pdf.set_fill_color(245, 245, 255) # Professional soft lavender
         pdf.rect(10, pdf.get_y(), 190, box_height, 'F')
         
-        # Step 4: Render Content
+        # Step 4: Render the content inside the box
         pdf.chapter_title("2. Guru AI - Karmic Insight")
         pdf.set_font('Arial', 'I', 10)
-        pdf.set_text_color(40, 40, 80) # Darker blue for readability
-        pdf.multi_cell(0, 6, cleaned_pitch)
-        pdf.ln(8) # Space after the box
+        pdf.set_text_color(40, 40, 80) # Dark navy for high readability
+        
+        # We use a slightly narrower width (180) to give the box internal padding
+        pdf.set_x(15) 
+        pdf.multi_cell(180, 6, cleaned_pitch)
+        
+        # Reset text color for the rest of the report
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(10)
     
     
     # 3. ASHTA KOOTA ANALYSIS (Professional Table)
