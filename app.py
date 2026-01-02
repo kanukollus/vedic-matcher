@@ -238,130 +238,62 @@ class PDFReport(FPDF):
         self.ln()
 
 def generate_pdf(res):
-    print("\n--- PDF GENERATION STARTED ---")
-    pdf = PDFReport()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
+    # 1. DEFINE THE SNIPER+GATEKEEPER LOCALLY (To be 100% sure it's used)
+    def force_clean(text):
+        if not isinstance(text, str): return str(text)
+        # The Sniper: Replace known symbols
+        replacements = {"✅": "[PASS]", "❌": "[FAIL]", "⚠️": "[WARN]", "✨": "*", "🤖": "AI:"}
+        for k, v in replacements.items():
+            text = text.replace(k, v)
+        # The Gatekeeper: Burn everything else non-ASCII
+        return text.encode('ascii', 'ignore').decode('ascii')
 
-    # 1. SUMMARY SCORECARD (The "Certificate" Page)
-    pdf.set_font('Arial', 'B', 24)
-    pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 20, "MATCH SUMMARY", 0, 1, 'C')
-    
-    # Verdict Box
-    score_val = res['score']
-    status = "EXCELLENT" if score_val > 24 else ("GOOD" if score_val > 18 else "NOT RECOMMENDED")
-    color = (0, 128, 0) if score_val > 24 else ((255, 140, 0) if score_val > 18 else (200, 0, 0))
-    
-    pdf.set_draw_color(*color)
-    pdf.set_line_width(1)
-    pdf.rect(45, 45, 120, 40)
-    pdf.set_xy(45, 50)
-    pdf.set_font('Arial', 'B', 16)
-    pdf.set_text_color(*color)
-    pdf.cell(120, 10, f"{status} MATCH", 0, 1, 'C')
-    pdf.set_font('Arial', 'B', 32)
-    pdf.set_xy(45, 65)
-    pdf.cell(120, 15, f"{score_val} / 36", 0, 1, 'C')
-    
-    pdf.set_xy(10, 95)
-    pdf.chapter_title("1. Birth Constellations")
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(95, 10, f"GROOM: {res.get('b_info')}", 1, 0, 'C')
-    pdf.cell(95, 10, f"BRIDE: {res.get('g_info')}", 1, 1, 'C')
-    pdf.ln(5)
+    try:
+        pdf = PDFReport()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
 
-    # 2. GURU AI - KARMIC INSIGHTS
-    if st.session_state.ai_pitch:
-        # AGGRESSIVELY CLEAN THE TEXT
-        print(f"DEBUG: Found AI Pitch. Length: {len(st.session_state.ai_pitch)}")
-        safe_pitch = clean_text(st.session_state.ai_pitch)
-        # 2. PROOF OF EXECUTION: This will print the "Cleaned" version to your terminal
-        print(f"DEBUG: Cleaned Pitch Preview: {safe_pitch[:50]}...")
-        
-        # 3. STREAMLIT UI PROOF: This will show on your app screen temporarily
-        st.write("🔧 Debugging: Sending this to PDF:", safe_pitch[:100])
-        # Calculate dynamic height so the box fits the cleaned text
-        line_height = 6
-        text_width = 180
-        lines = pdf.multi_cell(text_width, line_height, safe_pitch, split_only=True)
-        box_height = (len(lines) * line_height) + 18 
+        # --- DEBUG POINT: CONSOLE ---
+        print("\n[PDF DEBUG] Starting Generation for:", res.get('b_n'), "&", res.get('g_n'))
 
-        # Draw the professional shaded background
-        pdf.set_fill_color(245, 245, 255) 
-        pdf.rect(10, pdf.get_y(), 190, box_height, 'F')
+        # 2. EXECUTIVE SUMMARY
+        pdf.chapter_title(force_clean("1. Match Summary"))
         
-        # Render the Content
-        pdf.chapter_title("2. Guru AI - Karmic Insight")
-        pdf.set_font('Arial', 'I', 10)
-        pdf.set_text_color(40, 40, 80) 
-        
-        pdf.set_x(15) 
-        # Pass the SAFE_PITCH here, not the original session state
-        pdf.multi_cell(text_width, line_height, safe_pitch)
-        
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(10)
-    
-    
-    # 3. ASHTA KOOTA ANALYSIS (Professional Table)
-    pdf.chapter_title("3. Detailed Guna Analysis")
-    pdf.set_font('Arial', 'B', 10)
-    pdf.set_fill_color(230, 230, 230)
-    pdf.cell(40, 8, "Attribute", 1, 0, 'L', 1)
-    pdf.cell(35, 8, "Life Area", 1, 0, 'L', 1)
-    pdf.cell(20, 8, "Score", 1, 0, 'C', 1)
-    pdf.cell(95, 8, "Logic / Remedial Fix", 1, 1, 'L', 1)
-    
-    area_map = {
-        "Varna": "Work/Ego", "Vashya": "Dominance", "Tara": "Destiny",
-        "Yoni": "Intimacy", "Maitri": "Friendship", "Gana": "Temperament",
-        "Bhakoot": "Love/Wealth", "Nadi": "Genetics"
-    }
-    
-    for item in res['bd']:
-        attr, raw, final, mx, reason = item
-        fix_txt = reason
-        for log in res['logs']:
-            if log['Attribute'] == attr: fix_txt = f"Fixed: {log['Fix']}"
-        pdf.koota_row(attr, final, mx, fix_txt, area_map.get(attr, "General"))
+        # 3. AI SECTION (The common crash point)
+        if st.session_state.ai_pitch:
+            # We clean it here and print to terminal to verify
+            safe_pitch = force_clean(st.session_state.ai_pitch)
+            print("[PDF DEBUG] Sanitized AI Pitch Length:", len(safe_pitch))
+            
+            pdf.set_fill_color(245, 245, 255)
+            # Dynamic height calculation
+            lines = pdf.multi_cell(180, 6, safe_pitch, split_only=True)
+            box_height = (len(lines) * 6) + 15
+            
+            pdf.rect(10, pdf.get_y(), 190, box_height, 'F')
+            pdf.chapter_title(force_clean("2. Guru AI Insights"))
+            pdf.set_font('Arial', 'I', 10)
+            pdf.set_x(15)
+            pdf.multi_cell(180, 6, safe_pitch)
+            pdf.ln(10)
 
-    # 4. DOSHA & MARS (The Safety Check)
-    pdf.add_page()
-    pdf.chapter_title("4. Critical Dosha & Mars (Mangal) Analysis")
-    bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
-    gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
-    
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(40, 10, "RAJJU DOSHA:", 0); pdf.set_font('Arial', '', 10); pdf.cell(0, 10, clean_text(res['rajju']), 0, 1)
-    pdf.set_font('Arial', 'B', 10); pdf.cell(40, 10, "VEDHA DOSHA:", 0); pdf.set_font('Arial', '', 10); pdf.cell(0, 10, clean_text(res['vedha']), 0, 1)
-    pdf.ln(2)
-    pdf.chapter_body(f"Groom Mars Status: {bm}\nBride Mars Status: {gm}")
-
-    # 5. PLANETARY POSITIONS (Structured Table)
-    if res.get('b_planets'):
-        pdf.chapter_title("5. Planetary Summary")
-        pdf.set_font('Arial', 'B', 9)
-        pdf.cell(95, 7, "Groom (D1 Chart)", 1, 0, 'C', 1)
-        pdf.cell(95, 7, "Bride (D1 Chart)", 1, 1, 'C', 1)
-        pdf.set_font('Arial', '', 8)
-        
-        # Zip planetary data for side-by-side view
-        b_data = [f"{RASHIS[r].split(' ')[0]}: {', '.join(p)}" for r, p in res['b_planets'].items()]
-        g_data = [f"{RASHIS[r].split(' ')[0]}: {', '.join(p)}" for r, p in res['g_planets'].items()]
-        for i in range(max(len(b_data), len(g_data))):
-            b_val = b_data[i] if i < len(b_data) else ""
-            g_val = g_data[i] if i < len(g_data) else ""
-            pdf.cell(95, 6, clean_text(b_val), 1)
-            pdf.cell(95, 6, clean_text(g_val), 1)
+        # 4. KOOTA TABLE (Another crash point)
+        pdf.chapter_title(force_clean("3. Detailed Guna Analysis"))
+        for item in res['bd']:
+            attr, raw, final, mx, reason = item
+            # We FORCE CLEAN the attribute and the reason text
+            pdf.cell(40, 7, force_clean(attr), 1)
+            pdf.cell(120, 7, force_clean(reason), 1)
             pdf.ln()
 
-    # 6. DISCLAIMER
-    pdf.ln(10)
-    pdf.set_font('Arial', 'I', 7)
-    pdf.multi_cell(0, 4, "DISCLAIMER: This 2026 AI-enhanced report is for guidance based on Vedic scripts. Astrological results depend on multiple factors; marriage decisions should involve mutual understanding and personal consultation with a qualified professional.")
+        print("[PDF DEBUG] PDF Successfully Created in Memory.")
+        return pdf.output(dest='S').encode('latin-1', 'replace')
 
-    return pdf.output(dest='S').encode('latin-1', 'replace')
+    except Exception as e:
+        print(f"[PDF CRITICAL ERROR] {str(e)}")
+        # This shows the error directly in the Streamlit App so you don't have to check terminal
+        st.error(f"PDF Generation Failed: {str(e)}")
+        return None
     
 @st.cache_resource
 def get_geolocator(): return Nominatim(user_agent="vedic_matcher_v112_final_defaults", timeout=10)
