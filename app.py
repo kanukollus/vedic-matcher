@@ -121,8 +121,8 @@ def clean_text(text):
     if not isinstance(text, str): 
         return str(text)
     
-    # Step 1: Manual mapping of common symbols to professional text
-    # This keeps the 'meaning' of the icons without the crash-prone characters
+    # 1. Map modern symbols to professional text labels
+    # This preserves the 'intent' without the crash-prone characters
     replacements = {
         "✅": "[PASS]", "❌": "[FAIL]", "⚠️": "[WARN]", 
         "✨": "*", "⭐": "*", "🔥": "[ENERGY]", 
@@ -131,9 +131,9 @@ def clean_text(text):
     for k, v in replacements.items():
         text = text.replace(k, v)
         
-    # Step 2: The "Burn-It-Down" Safety Net
-    # We encode to ASCII and IGNORE anything that isn't a standard character.
-    # This effectively removes \u2728 and any other hidden Unicode ghosts.
+    # 2. THE FINAL SAFETY NET: Force-convert to ASCII
+    # 'ignore' strips any character that cannot be encoded (like \u2728)
+    # ensuring the PDF generator NEVER crashes again.
     return text.encode('ascii', 'ignore').decode('ascii')
 
 def format_chart_for_ai(chart_data):
@@ -273,29 +273,30 @@ def generate_pdf(res):
 
     # 2. GURU AI - KARMIC INSIGHTS (Dynamic & Crash-Proof)
     if st.session_state.ai_pitch:
-        # Step 1: Sanitize text immediately using the bulletproof filter
+        # Step 1: Sanitize text immediately using the force-filter
         cleaned_pitch = clean_text(st.session_state.ai_pitch)
         
         # Step 2: Calculate dynamic height
+        # split_only=True is a pro FPDF feature that measures text height
         line_height = 6
         text_width = 180
-        # This measures how many lines the text will occupy before printing
         lines = pdf.multi_cell(text_width, line_height, cleaned_pitch, split_only=True)
-        box_height = (len(lines) * line_height) + 18 # 18 units for header and padding
+        # 18 units for the title and internal padding
+        box_height = (len(lines) * line_height) + 18 
 
         # Step 3: Draw the professional shaded background
-        pdf.set_fill_color(245, 245, 255) # Soft lavender/blue
+        pdf.set_fill_color(245, 245, 255) # Light Lavender
         pdf.rect(10, pdf.get_y(), 190, box_height, 'F')
         
         # Step 4: Render Content
         pdf.chapter_title("2. Guru AI - Karmic Insight")
         pdf.set_font('Arial', 'I', 10)
-        pdf.set_text_color(40, 40, 80) # Dark navy for high contrast
+        pdf.set_text_color(40, 40, 80) # Dark navy for high readability
         
         pdf.set_x(15) # Internal padding from the box edge
         pdf.multi_cell(text_width, line_height, cleaned_pitch)
         
-        # Reset colors and add spacing for the next section
+        # Reset color and add spacing for the next section
         pdf.set_text_color(0, 0, 0)
         pdf.ln(10)
     
