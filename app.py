@@ -238,6 +238,7 @@ class PDFReport(FPDF):
         self.ln()
 
 def generate_pdf(res):
+    print("\n--- PDF GENERATION STARTED ---")
     pdf = PDFReport()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
@@ -273,8 +274,13 @@ def generate_pdf(res):
     # 2. GURU AI - KARMIC INSIGHTS
     if st.session_state.ai_pitch:
         # AGGRESSIVELY CLEAN THE TEXT
+        print(f"DEBUG: Found AI Pitch. Length: {len(st.session_state.ai_pitch)}")
         safe_pitch = clean_text(st.session_state.ai_pitch)
+        # 2. PROOF OF EXECUTION: This will print the "Cleaned" version to your terminal
+        print(f"DEBUG: Cleaned Pitch Preview: {safe_pitch[:50]}...")
         
+        # 3. STREAMLIT UI PROOF: This will show on your app screen temporarily
+        st.write("🔧 Debugging: Sending this to PDF:", safe_pitch[:100])
         # Calculate dynamic height so the box fits the cleaned text
         line_height = 6
         text_width = 180
