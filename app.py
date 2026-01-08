@@ -761,7 +761,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         final_status_override = "Risky Match (Double Dosha) ❌"
     
     # Check for Rajju (This will take priority or add to the warning)
-    final_status_override = None
     if rajju_status == "Fail":
         final_status_override = "Risky Match (Rajju Dosha) ❌"
     
