@@ -798,8 +798,8 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
             is_risky = (safety == "Risky Match (Double Dosha) ❌")
             is_risky = (safety == "Risky Match (Rajju Dosha) ❌")
             is_risky = (safety == "Risky Match (Vedha Dosha) ❌")
-            is_risky = (safety == "Risky Match (Boy has Kuja Dosha) ❌")
-            is_risky = (safety == "Risky Match (Girl has Kuja Dosha) ❌")
+            #is_risky = (safety == "Risky Match (Boy has Kuja Dosha) ❌")
+            #is_risky = (safety == "Risky Match (Girl has Kuja Dosha) ❌")
             
             
             if score > 18:
@@ -927,15 +927,15 @@ with tabs[0]:
                 
                 # 2. NEW: Flag Kuja Dosha Mismatch as Risky
                 # 2. Flag Kuja Dosha Mismatch (Appends to safety_override if it exists)
-                b_has_dosha = b_mars_result[0] if isinstance(b_mars_result, tuple) else False
-                g_has_dosha = g_mars_result[0] if isinstance(g_mars_result, tuple) else False
+                #b_has_dosha = b_mars_result[0] if isinstance(b_mars_result, tuple) else False
+                #g_has_dosha = g_mars_result[0] if isinstance(g_mars_result, tuple) else False
             
-                if (b_has_dosha and not g_has_dosha):
-                    prefix = f"{safety_override} + " if safety_override else ""
-                    safety_override = f"{prefix}Risky Match (Boy has Kuja Dosha) ❌"
-                if (g_has_dosha and not b_has_dosha):
-                    prefix = f"{safety_override} + " if safety_override else ""
-                    safety_override = f"{prefix}Risky Match (Girl has Kuja Dosha) ❌"
+                #if (b_has_dosha and not g_has_dosha):
+                 #   prefix = f"{safety_override} + " if safety_override else ""
+                  #  safety_override = f"{prefix}Risky Match (Boy has Kuja Dosha) ❌"
+                #if (g_has_dosha and not b_has_dosha):
+                 #   prefix = f"{safety_override} + " if safety_override else ""
+                  #  safety_override = f"{prefix}Risky Match (Girl has Kuja Dosha) ❌"
                 
                 raw_score = sum(row[1] for row in breakdown)
                 
@@ -1015,10 +1015,10 @@ with tabs[0]:
             status = "Risky Match ❌ (Rajju Dosha)"
         if res.get('safety') == "Risky Match (Vedha Dosha) ❌":
             status = "Risky Match ❌ (Vedha Dosha)"
-        if res.get('safety') == "Risky Match (Boy has Kuja Dosha) ❌":
-            status = "Risky Match ❌ (Boy has Kuja Dosha)"
-        if res.get('safety') == "Risky Match (Girl has Kuja Dosha) ❌":
-            status = "Risky Match ❌ (Girl has Kuja Dosha)"
+        #if res.get('safety') == "Risky Match (Boy has Kuja Dosha) ❌":
+         #   status = "Risky Match ❌ (Boy has Kuja Dosha)"
+        #if res.get('safety') == "Risky Match (Girl has Kuja Dosha) ❌":
+         #   status = "Risky Match ❌ (Girl has Kuja Dosha)"
             
         
         st.markdown(f"""
