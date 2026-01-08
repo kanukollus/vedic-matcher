@@ -112,6 +112,7 @@ SYNERGY_MEANINGS = {
     "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths.",
     "Ketu": "Past Life Bond. A deep, spiritual sense of knowing each other from before."
 }
+RAJJU_NAMES = ["Pada (Feet)", "Uru (Thighs)", "Nabhi (Navel)", "Kanti (Neck)", "Sira (Head)"]
 
 # --- 5. HELPER FUNCTIONS ---
 
@@ -710,8 +711,23 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     final_status_override = None
     if score > 18 and bhakoot_score == 0 and nadi_score == 0:
         final_status_override = "Risky Match ❌"
+    rajju_status = "Pass"
+    vedha_status = "Pass"
+    rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
+    
+    # Get the specific Rajju names for the report
+    b_rajju_name = RAJJU_NAMES[rajju_group[b_nak]]
+    g_rajju_name = RAJJU_NAMES[rajju_group[g_nak]]
 
-    return score, bd, logs, rajju_status, vedha_status, final_status_override
+    if rajju_group[b_nak] == rajju_group[g_nak]:
+        rajju_status = "Fail"
+        if friends or b_rashi == g_rashi: 
+            rajju_status = "Cancelled"
+            logs.append({"Attribute": "Rajju", "Problem": f"Both: {b_rajju_name}", "Fix": "Maitri overrides Rajju.", "Source": "Kala Vidhana"})
+    
+    # Update the return statement to include these names
+    return score, bd, logs, rajju_status, vedha_status, final_status_override, b_rajju_name, g_rajju_name
+
 
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     matches = []
@@ -733,9 +749,9 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
             t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
             
             if source_gender == "Boy": 
-                score, bd, logs, _, _, safety = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
+                score, bd, logs, _, _, safety,b_rajju_label, g_rajju_label = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
             else: 
-                score, bd, logs, _, _, safety = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+                score, bd, logs, _, _, safety,b_rajju_label, g_rajju_label = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
             
             is_risky = (safety == "Risky Match ❌")
             
@@ -855,7 +871,7 @@ with tabs[0]:
                     b_pada = b_pada_sel
                     g_pada = g_pada_sel
 
-                score, breakdown, logs, rajju, vedha, safety_override = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
+                score, breakdown, logs, rajju, vedha, safety_override,b_rajju_label, g_rajju_label = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
                 raw_score = sum(row[1] for row in breakdown)
                 
                 b_obs, g_obs = [], []
@@ -876,6 +892,8 @@ with tabs[0]:
                     "g_info": f"{NAKSHATRAS[g_nak]} ({g_rashi_name}, Pada {g_pada})",
                     "b_mars": b_mars_result, "g_mars": g_mars_result,
                     "rajju": rajju, "vedha": vedha,
+                    "b_rajju_label": b_rajju_label,
+                    "g_rajju_label": g_rajju_label,
                     "b_planets": b_planets, "g_planets": g_planets,
                     "b_d9": b_d9, "g_d9": g_d9,
                     "verdict": human_verdict, "b_obs": b_obs, "g_obs": g_obs,
@@ -999,15 +1017,33 @@ with tabs[0]:
             st.table(pd.concat([df, totals], ignore_index=True))
         
         with st.expander("🪐 Mars & Dosha Analysis"):
-            st.write(f"**Rajju:** {res['rajju']} (Body Check)"); st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
+            # Display Specific Rajju Names
+            c_r1, c_r2 = st.columns(2)
+            with c_r1:
+                st.write(f"**Boy Rajju:** {res.get('b_rajju_label', 'N/A')}")
+            with c_r2:
+                st.write(f"**Girl Rajju:** {res.get('g_rajju_label', 'N/A')}")
+            
+            st.divider()
+            
+            st.write(f"**Overall Rajju Match:** {res['rajju']}")
+            st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
+            
             bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
-            st.write(f"**Boy Mars:** {bm}"); st.write(f"**Girl Mars:** {gm}")
+            
+            st.write(f"**Boy Mars:** {bm}")
+            st.write(f"**Girl Mars:** {gm}")
+            
             b_is_dosha = res['b_mars'][0] if isinstance(res['b_mars'], tuple) else False
             g_is_dosha = res['g_mars'][0] if isinstance(res['g_mars'], tuple) else False
-            if b_is_dosha and g_is_dosha: st.success("🔥➕🔥 **Perfect Match:** Both have high energy (Manglik). Your intensities match perfectly.")
-            elif not b_is_dosha and not g_is_dosha: st.success("✨➕✨ **Calm Match:** Both have peaceful Mars placements. A gentle relationship.")
-            else: st.warning("🔥⚡✨ **Energy Mismatch:** One is High Intensity, one is Calm. This often requires active adjustment.")
+            
+            if b_is_dosha and g_is_dosha: 
+                st.success("🔥➕🔥 **Perfect Match:** Both have high energy (Manglik). Your intensities match perfectly.")
+            elif not b_is_dosha and not g_is_dosha: 
+                st.success("✨➕✨ **Calm Match:** Both have peaceful Mars placements. A gentle relationship.")
+            else: 
+                st.warning("🔥⚡✨ **Energy Mismatch:** One is High Intensity, one is Calm. This often requires active adjustment.")
 
     try:
         if st.button("📄 Download Full Report"):
