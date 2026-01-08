@@ -713,25 +713,27 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     # --- UPDATED RAJJU CALCULATION ---
    # 1. RAJJU CALCULATION (Using your specific assignment table)
     rajju_status = "Pass"
+    rajju_reason = "No Rajju Dosha"
     
-    # Get IDs from the manual RAJJU_MAPPING we created
     b_rajju_id = RAJJU_MAPPING[b_nak]
     g_rajju_id = RAJJU_MAPPING[g_nak]
-    
-    # Get Names for the UI/Report
     b_rajju_name = RAJJU_NAMES[b_rajju_id]
     g_rajju_name = RAJJU_NAMES[g_rajju_id]
 
-    # Rajju Dosha occurs if both belong to the same Rajju
     if b_rajju_id == g_rajju_id:
         rajju_status = "Fail"
-        # Exception: Strong Maitri or Same Rashi can cancel it
+        rajju_reason = f"Both belong to {b_rajju_name}"
+        
+        # Check for Cancellation
         if friends or b_rashi == g_rashi:
             rajju_status = "Cancelled"
+            cancellation_type = "Graha Maitri" if friends else "Same Rashi"
+            rajju_reason = f"Cancelled due to {cancellation_type}"
+            
             logs.append({
                 "Attribute": "Rajju", 
-                "Problem": f"Both: {b_rajju_name}", 
-                "Fix": "Maitri/Rashi cancellation applied.", 
+                "Problem": f"Same Rajju ({b_rajju_name})", 
+                "Fix": f"Neutralized by {cancellation_type}", 
                 "Source": "Vedic Tradition"
             })
 
@@ -766,7 +768,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
          final_status_override = "Risky Match (Vedha Dosha) ❌"
         
     # 4. FINAL RETURN
-    return score, bd, logs, rajju_status, vedha_status, final_status_override, b_rajju_name, g_rajju_name
+    return score, bd, logs, rajju_status, vedha_status, final_status_override, b_rajju_name, g_rajju_name, rajju_reason
 
 
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
@@ -948,7 +950,7 @@ with tabs[0]:
                     "b_info": f"{NAKSHATRAS[b_nak]} ({b_rashi_name}, Pada {b_pada})",
                     "g_info": f"{NAKSHATRAS[g_nak]} ({g_rashi_name}, Pada {g_pada})",
                     "b_mars": b_mars_result, "g_mars": g_mars_result,
-                    "rajju": rajju, "vedha": vedha,
+                    "rajju": rajju, "vedha": vedha,"rajju_reason": rajju_reason,
                     "b_rajju_label": b_rajju_label,
                     "g_rajju_label": g_rajju_label,
                     "b_planets": b_planets, "g_planets": g_planets,
@@ -1073,8 +1075,8 @@ with tabs[0]:
             totals = pd.DataFrame([["TOTAL", df["Raw Score"].sum(), df["Final Remedied Score"].sum(), 36, "-"]], columns=df.columns)
             st.table(pd.concat([df, totals], ignore_index=True))
         
-        with st.expander("🪐 Mars & Dosha Analysis"):
-            # Display Specific Rajju Names
+       with st.expander("🪐 Mars & Dosha Analysis"):
+            # 1. Display Specific Rajju Names
             c_r1, c_r2 = st.columns(2)
             with c_r1:
                 st.write(f"**Boy Rajju:** {res.get('b_rajju_label', 'N/A')}")
@@ -1082,15 +1084,27 @@ with tabs[0]:
                 st.write(f"**Girl Rajju:** {res.get('g_rajju_label', 'N/A')}")
             
             st.divider()
+        
+            # 2. Show the Overall Rajju Status and Detailed Reason
+            status_color = "red" if res['rajju'] == "Fail" else ("orange" if res['rajju'] == "Cancelled" else "green")
             
-            st.write(f"**Overall Rajju Match:** {res['rajju']}")
-            st.write(f"**Vedha:** {res['vedha']} (Enemy Check)")
+            st.markdown(f"**Overall Rajju Match:** <span style='color:{status_color}; font-weight:bold;'>{res['rajju']}</span>", unsafe_allow_html=True)
             
+            # This info box tells the user WHY it was cancelled (e.g., Graha Maitri)
+            st.info(f"💡 {res.get('rajju_reason', 'No Rajju Dosha detected.')}")
+            
+            # 3. Show Vedha Status
+            v_color = "red" if res['vedha'] == "Fail" else "green"
+            st.markdown(f"**Vedha (Enemy Check):** <span style='color:{v_color}; font-weight:bold;'>{res['vedha']}</span>", unsafe_allow_html=True)
+            
+            st.divider()
+        
+            # 4. Mars (Mangal) Section
             bm = res['b_mars'][1] if isinstance(res['b_mars'], tuple) else res['b_mars']
             gm = res['g_mars'][1] if isinstance(res['g_mars'], tuple) else res['g_mars']
             
-            st.write(f"**Boy Mars:** {bm}")
-            st.write(f"**Girl Mars:** {gm}")
+            st.write(f"**Boy Mars Analysis:** {bm}")
+            st.write(f"**Girl Mars Analysis:** {gm}")
             
             b_is_dosha = res['b_mars'][0] if isinstance(res['b_mars'], tuple) else False
             g_is_dosha = res['g_mars'][0] if isinstance(res['g_mars'], tuple) else False
@@ -1100,7 +1114,7 @@ with tabs[0]:
             elif not b_is_dosha and not g_is_dosha: 
                 st.success("✨➕✨ **Calm Match:** Both have peaceful Mars placements. A gentle relationship.")
             else: 
-                st.warning("🔥⚡✨ **Energy Mismatch:** One is High Intensity, one is Calm. This often requires active adjustment.")
+                st.warning("🔥⚡✨ **Energy Mismatch:** One is High Intensity, one is Calm. This requires active adjustment.")
 
     try:
         if st.button("📄 Download Full Report"):
