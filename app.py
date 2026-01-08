@@ -1075,7 +1075,7 @@ with tabs[0]:
             totals = pd.DataFrame([["TOTAL", df["Raw Score"].sum(), df["Final Remedied Score"].sum(), 36, "-"]], columns=df.columns)
             st.table(pd.concat([df, totals], ignore_index=True))
         
-       with st.expander("🪐 Mars & Dosha Analysis"):
+        with st.expander("🪐 Mars & Dosha Analysis"):
             # 1. Display Specific Rajju Names
             c_r1, c_r2 = st.columns(2)
             with c_r1:
