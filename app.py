@@ -791,9 +791,9 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
             t_d9_rashi = get_d9_rashi_from_pada(i, t_pada)
             
             if source_gender == "Boy": 
-                score, bd, logs, _, _, safety,b_rajju_label, g_rajju_label = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
+                score, bd, logs, _, _, safety,b_rajju_label, g_rajju_label,_ = calculate_all(s_nak, s_rashi, i, t_rashi_idx, s_d9_rashi, t_d9_rashi)
             else: 
-                score, bd, logs, _, _, safety,b_rajju_label, g_rajju_label = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
+                score, bd, logs, _, _, safety,b_rajju_label, g_rajju_label,_ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
             
             is_risky = (safety == "Risky Match ❌")
             
@@ -913,11 +913,11 @@ with tabs[0]:
                     b_pada = b_pada_sel
                     g_pada = g_pada_sel
 
-                score, breakdown, logs, rajju, vedha, safety_override,b_rajju_label, g_rajju_label = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
+                score, breakdown, logs, rajju, vedha, safety_override,b_rajju_label, g_rajju_label,rajju_reason = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
                # --- Inside the "Check Compatibility" button logic ---
 
                 # 1. Run the standard Koota/Rajju calculations
-                score, breakdown, logs, rajju, vedha, safety_override, b_rajju_label, g_rajju_label = calculate_all(
+                score, breakdown, logs, rajju, vedha, safety_override, b_rajju_label, g_rajju_label,rajju_reason = calculate_all(
                     b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi
                 )
                 
