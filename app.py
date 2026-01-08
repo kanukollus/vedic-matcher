@@ -112,7 +112,29 @@ SYNERGY_MEANINGS = {
     "Rahu": "Destiny Link. A magnetic, obsessive pull towards similar unconventional paths.",
     "Ketu": "Past Life Bond. A deep, spiritual sense of knowing each other from before."
 }
-RAJJU_NAMES = ["Pada (Feet)", "Uru (Thighs)", "Nabhi (Navel)", "Kanti (Neck)", "Sira (Head)"]
+
+# Updated to match your specific assignment
+RAJJU_NAMES = ["Siro (Head)", "Kantha (Neck)", "Madhya (Belly)", "Kati (Waist)", "Pada (Foot)"]
+
+# Manually mapped index (0-26) to Rajju ID (0-4) based on your table
+# 0: Siro, 1: Kantha, 2: Madhya, 3: Kati, 4: Pada
+RAJJU_MAPPING = [
+    0, 1, 2, 3, 4, # Ashwini to Mrigashira
+    0, 1, 2, 3, 4, # Ardra to Magha
+    0, 1, 2, 3, 4, # P.Phalguni to Swati
+    0, 1, 2, 3, 4, # Vishakha to P.Ashadha
+    0, 1, 2, 3, 4, # U.Ashadha to P.Bhadrapada
+    0, 1           # U.Bhadrapada, Revati
+]
+
+# Special cases from your table: Dhanishta (22) and Shatabhisha (23)
+# In the loop above, index 22 is 2 (Madhya) and 23 is 3 (Kati)
+# Your table says: Dhanishta = Madhya, Shatabhisha = Madhya, Kati = Dhanishta (Shared)
+# We will hardcode these specific indices to match your list exactly.
+RAJJU_MAPPING[22] = 2 # Dhanishta -> Madhya
+RAJJU_MAPPING[23] = 2 # Shatabhisha -> Madhya
+# Note: Since your Kati list only has 4 primary stars + shared Dhanishta, 
+# we keep index 22/23 as Madhya based on your 'Madhya' list.
 
 # --- 5. HELPER FUNCTIONS ---
 
@@ -688,44 +710,62 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     score += n_final; bd.append(("Nadi", n_raw, n_final, 8, n_reason))
 
     # South Indian
+    # --- UPDATED RAJJU CALCULATION ---
+   # 1. RAJJU CALCULATION (Using your specific assignment table)
     rajju_status = "Pass"
-    vedha_status = "Pass"
-    rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
-    if rajju_group[b_nak] == rajju_group[g_nak]:
-        rajju_status = "Fail"
-        if friends or b_rashi == g_rashi: 
-            rajju_status = "Cancelled"
-            logs.append({"Attribute": "Rajju", "Problem": "Body Part Clash", "Fix": "Maitri overrides Rajju.", "Source": "Kala Vidhana"})
     
+    # Get IDs from the manual RAJJU_MAPPING we created
+    b_rajju_id = RAJJU_MAPPING[b_nak]
+    g_rajju_id = RAJJU_MAPPING[g_nak]
+    
+    # Get Names for the UI/Report
+    b_rajju_name = RAJJU_NAMES[b_rajju_id]
+    g_rajju_name = RAJJU_NAMES[g_rajju_id]
+
+    # Rajju Dosha occurs if both belong to the same Rajju
+    if b_rajju_id == g_rajju_id:
+        rajju_status = "Fail"
+        # Exception: Strong Maitri or Same Rashi can cancel it
+        if friends or b_rashi == g_rashi:
+            rajju_status = "Cancelled"
+            logs.append({
+                "Attribute": "Rajju", 
+                "Problem": f"Both: {b_rajju_name}", 
+                "Fix": "Maitri/Rashi cancellation applied.", 
+                "Source": "Vedic Tradition"
+            })
+
+    # 2. VEDHA CALCULATION (Enemy Stars)
+    vedha_status = "Pass"
     vedha_pairs = {0: 17, 1: 16, 2: 15, 3: 14, 4: 22, 5: 21, 6: 20, 7: 19, 8: 18, 9: 26, 10: 25, 11: 24, 12: 23, 13: 13}
-    for k, v in list(vedha_pairs.items()): vedha_pairs[v] = k
+    # Create reverse mapping
+    temp_pairs = list(vedha_pairs.items())
+    for k, v in temp_pairs: vedha_pairs[v] = k
+    
     if vedha_pairs.get(g_nak) == b_nak:
         vedha_status = "Fail"
-    
-    # CRITICAL SAFETY CHECK
+
+    # 3. CRITICAL SAFETY CHECK
     bhakoot_score = 0; nadi_score = 0
     for item in bd:
         if item[0] == "Bhakoot": bhakoot_score = item[2]
         if item[0] == "Nadi": nadi_score = item[2]
         
     final_status_override = None
+    
+    # Check for Double Zero (Bhakoot + Nadi)
     if score > 18 and bhakoot_score == 0 and nadi_score == 0:
-        final_status_override = "Risky Match ❌"
-    rajju_status = "Pass"
-    vedha_status = "Pass"
-    rajju_group = [0, 1, 2, 3, 4, 3, 2, 1, 0] * 3
+        final_status_override = "Risky Match (Double Dosha) ❌"
     
-    # Get the specific Rajju names for the report
-    b_rajju_name = RAJJU_NAMES[rajju_group[b_nak]]
-    g_rajju_name = RAJJU_NAMES[rajju_group[g_nak]]
-
-    if rajju_group[b_nak] == rajju_group[g_nak]:
-        rajju_status = "Fail"
-        if friends or b_rashi == g_rashi: 
-            rajju_status = "Cancelled"
-            logs.append({"Attribute": "Rajju", "Problem": f"Both: {b_rajju_name}", "Fix": "Maitri overrides Rajju.", "Source": "Kala Vidhana"})
+    # Check for Rajju (This will take priority or add to the warning)
+    if rajju_status == "Fail":
+        final_status_override = "Risky Match (Rajju Dosha) ❌"
     
-    # Update the return statement to include these names
+    # Check for Vedha (Optional: Vedha is also a critical forbidden match)
+    if vedha_status == "Fail":
+         final_status_override = "Risky Match (Vedha Dosha) ❌"
+        
+    # 4. FINAL RETURN
     return score, bd, logs, rajju_status, vedha_status, final_status_override, b_rajju_name, g_rajju_name
 
 
@@ -872,6 +912,23 @@ with tabs[0]:
                     g_pada = g_pada_sel
 
                 score, breakdown, logs, rajju, vedha, safety_override,b_rajju_label, g_rajju_label = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
+               # --- Inside the "Check Compatibility" button logic ---
+
+                # 1. Run the standard Koota/Rajju calculations
+                score, breakdown, logs, rajju, vedha, safety_override, b_rajju_label, g_rajju_label = calculate_all(
+                    b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi
+                )
+                
+                # 2. NEW: Flag Kuja Dosha Mismatch as Risky
+                b_has_dosha = b_mars_result[0] if isinstance(b_mars_result, tuple) else False
+                g_has_dosha = g_mars_result[0] if isinstance(g_mars_result, tuple) else False
+                
+                # If one has it and the other doesn't, it's a mismatch (Risky)
+                if (b_has_dosha and not g_has_dosha) or (g_has_dosha and not b_has_dosha):
+                    # We append to existing safety overrides if they exist
+                    prefix = f"{safety_override} + " if safety_override else ""
+                    safety_override = f"{prefix}Risky Match (Kuja Dosha Mismatch) ❌"
+                
                 raw_score = sum(row[1] for row in breakdown)
                 
                 b_obs, g_obs = [], []
