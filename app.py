@@ -712,8 +712,9 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
     # South Indian
     # --- UPDATED RAJJU CALCULATION ---
    # 1. RAJJU CALCULATION (Using your specific assignment table)
+    # 1. RAJJU CALCULATION
     rajju_status = "Pass"
-    rajju_reason = "No Rajju Dosha"
+    rajju_reason = "No Rajju Dosha detected."
     
     b_rajju_id = RAJJU_MAPPING[b_nak]
     g_rajju_id = RAJJU_MAPPING[g_nak]
@@ -722,18 +723,18 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
 
     if b_rajju_id == g_rajju_id:
         rajju_status = "Fail"
-        rajju_reason = f"Both belong to {b_rajju_name}"
+        rajju_reason = f"Both stars belong to {b_rajju_name}."
         
-        # Check for Cancellation
+        # CANCELLATION LOGIC
         if friends or b_rashi == g_rashi:
             rajju_status = "Cancelled"
-            cancellation_type = "Graha Maitri" if friends else "Same Rashi"
-            rajju_reason = f"Cancelled due to {cancellation_type}"
+            c_type = "Graha Maitri" if friends else "Same Moon Sign"
+            rajju_reason = f"Initial clash found ({b_rajju_name}), but it is **Cancelled due to {c_type}**."
             
             logs.append({
                 "Attribute": "Rajju", 
                 "Problem": f"Same Rajju ({b_rajju_name})", 
-                "Fix": f"Neutralized by {cancellation_type}", 
+                "Fix": f"Neutralized by {c_type}", 
                 "Source": "Vedic Tradition"
             })
 
@@ -760,6 +761,7 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         final_status_override = "Risky Match (Double Dosha) ❌"
     
     # Check for Rajju (This will take priority or add to the warning)
+    final_status_override = None
     if rajju_status == "Fail":
         final_status_override = "Risky Match (Rajju Dosha) ❌"
     
@@ -769,7 +771,6 @@ def calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi=None, g_d9_rashi=No
         
     # 4. FINAL RETURN
     return score, bd, logs, rajju_status, vedha_status, final_status_override, b_rajju_name, g_rajju_name, rajju_reason
-
 
 def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
     matches = []
@@ -913,7 +914,6 @@ with tabs[0]:
                     b_pada = b_pada_sel
                     g_pada = g_pada_sel
 
-                score, breakdown, logs, rajju, vedha, safety_override,b_rajju_label, g_rajju_label,rajju_reason = calculate_all(b_nak, b_rashi, g_nak, g_rashi, b_d9_rashi, g_d9_rashi)
                # --- Inside the "Check Compatibility" button logic ---
 
                 # 1. Run the standard Koota/Rajju calculations
@@ -922,12 +922,11 @@ with tabs[0]:
                 )
                 
                 # 2. NEW: Flag Kuja Dosha Mismatch as Risky
+                # 2. Flag Kuja Dosha Mismatch (Appends to safety_override if it exists)
                 b_has_dosha = b_mars_result[0] if isinstance(b_mars_result, tuple) else False
                 g_has_dosha = g_mars_result[0] if isinstance(g_mars_result, tuple) else False
-                
-                # If one has it and the other doesn't, it's a mismatch (Risky)
+            
                 if (b_has_dosha and not g_has_dosha) or (g_has_dosha and not b_has_dosha):
-                    # We append to existing safety overrides if they exist
                     prefix = f"{safety_override} + " if safety_override else ""
                     safety_override = f"{prefix}Risky Match (Kuja Dosha Mismatch) ❌"
                 
