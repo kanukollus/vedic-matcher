@@ -795,7 +795,11 @@ def find_best_matches(source_gender, s_nak, s_rashi, s_pada):
             else: 
                 score, bd, logs, _, _, safety,b_rajju_label, g_rajju_label,_ = calculate_all(i, t_rashi_idx, s_nak, s_rashi, t_d9_rashi, s_d9_rashi)
             
-            is_risky = (safety == "Risky Match ❌")
+            is_risky = (safety == "Risky Match (Double Dosha) ❌")
+            is_risky = (safety == "Risky Match (Rajju Dosha) ❌")
+            is_risky = (safety == "Risky Match (Vedha Dosha) ❌")
+            is_risky = (safety == "Risky Match (Kuja Dosha Mismatch) ❌")
+            
             
             if score > 18:
                 raw_score = sum(item[1] for item in bd)
@@ -1001,8 +1005,15 @@ with tabs[0]:
         status = "Excellent Match ✅" if res['score'] > 24 else ("Good Match ⚠️" if res['score'] > 18 else "Not Recommended ❌")
         
         # Override Status if Risky
-        if res.get('safety') == "Risky Match ❌":
+        if res.get('safety') == "Risky Match (Double Dosha) ❌":
             status = "Risky Match ❌ (Zero Bhakoot + Zero Nadi)"
+        if res.get('safety') == "Risky Match (Rajju Dosha) ❌":
+            status = "Risky Match ❌ (Rajju Dosha)"
+        if res.get('safety') == "Risky Match (Vedha Dosha) ❌":
+            status = "Risky Match ❌ (Vedha Dosha)"
+        if res.get('safety') == "Risky Match (Kuja Dosha Mismatch) ❌":
+            status = "Risky Match ❌ (Kuja Dosha)"
+            
         
         st.markdown(f"""
         <div style="background-color: {score_color}20; border: 2px solid {score_color}; padding: 10px; border-radius: 10px; margin-top: 10px; text-align: center;">
