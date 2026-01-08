@@ -977,7 +977,7 @@ with tabs[0]:
         if score_val >= 25: score_color = "#00cc00"
         
         # Override Color if Risky
-        if res.get('safety') == "Risky Match ❌":
+        if res.get('safety','').startswith("Risky Match"):
             score_color = "#ff4b4b" # Force Red
 
         c1, c2 = st.columns([1, 1])
